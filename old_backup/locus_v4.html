@@ -1,0 +1,895 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="Locus">
+<meta name="theme-color" content="#ffffff">
+<title>Locus</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:opsz,wght@9..40,300;9..40,400;9..40,500;9..40,600&family=DM+Serif+Display:ital@0;1&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<style>
+*{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent;user-select:none}
+:root{
+  --white:#fff;--off:#f5f5f7;--off2:#ebebf0;
+  --ink:#1d1d1f;--ink2:#6e6e73;--ink3:#aeaeb2;
+  --border:#e5e5ea;--blue:#007AFF;--green:#30d158;
+  --safe-top:env(safe-area-inset-top,0px);--safe-bot:env(safe-area-inset-bottom,0px);
+  --map-margin:44px; /* space on each side for orbs */
+}
+html,body{height:100%;height:100dvh;overflow:hidden;background:var(--off);
+  font-family:'DM Sans',sans-serif;color:var(--ink);-webkit-font-smoothing:antialiased}
+#app{display:flex;flex-direction:column;height:100dvh;overflow:hidden}
+
+/* ── TOPBAR ── */
+#topbar{flex-shrink:0;z-index:300;background:var(--white);border-bottom:1px solid var(--border);
+  padding:calc(var(--safe-top)+6px) 14px 8px;position:relative}
+.tb1{display:flex;align-items:center;justify-content:space-between;margin-bottom:8px}
+.logo{font-family:'DM Serif Display',serif;font-size:18px;letter-spacing:-.02em;color:var(--ink)}
+.mode-pills{display:flex;background:var(--off);border-radius:10px;padding:2px}
+.mp{padding:5px 16px;border-radius:8px;font-size:12px;font-weight:500;
+  color:var(--ink2);cursor:pointer;transition:all .18s;border:none;background:none;
+  font-family:'DM Sans',sans-serif}
+.mp.on{background:var(--white);color:var(--ink);box-shadow:0 1px 4px rgba(0,0,0,.1)}
+#filter-bar{display:flex;gap:7px;overflow-x:auto;scrollbar-width:none;padding-bottom:1px}
+#filter-bar::-webkit-scrollbar{display:none}
+.fc{flex-shrink:0;padding:5px 11px;border-radius:20px;border:1px solid var(--border);
+  background:var(--white);font-size:11px;font-weight:500;color:var(--ink2);
+  cursor:pointer;transition:all .15s;white-space:nowrap}
+.fc.on{background:var(--ink);color:var(--white);border-color:var(--ink)}
+#nav-search{display:none;margin-top:7px}
+.sw{display:flex;align-items:center;background:var(--off);border-radius:11px;
+  padding:0 11px;gap:7px;height:36px;border:1.5px solid transparent;transition:border-color .15s,background .15s}
+.sw:focus-within{background:var(--white);border-color:var(--blue)}
+.si{flex:1;border:none;background:transparent;font-family:'DM Sans',sans-serif;
+  font-size:13px;color:var(--ink);outline:none}
+.si::placeholder{color:var(--ink3)}
+#sugg{position:absolute;left:0;right:0;top:100%;background:white;
+  border-bottom:1px solid var(--border);z-index:400;max-height:200px;overflow-y:auto;display:none}
+.sg{padding:10px 14px;font-size:13px;cursor:pointer;display:flex;align-items:center;
+  gap:9px;border-bottom:1px solid var(--border)}
+.sg:active{background:var(--off)}
+
+/* ── MAP ZONE — has padding so orbs live in the margin ── */
+#map-zone{
+  flex-shrink:0;
+  position:relative;
+  height:52dvh;
+  background:var(--off); /* visible around the map card */
+  padding:var(--map-margin);
+}
+
+/* the actual map card, inset from edges */
+#map-card{
+  position:relative;
+  width:100%;height:100%;
+  border-radius:18px;
+  overflow:hidden;
+  box-shadow:0 2px 16px rgba(0,0,0,.12);
+  border:1px solid rgba(0,0,0,.06);
+}
+#map{width:100%;height:100%; z-index: 0;}
+.leaflet-control-attribution{display:none!important}
+.leaflet-control-zoom{border:none!important;border-radius:10px!important;overflow:hidden;
+  box-shadow:0 2px 8px rgba(0,0,0,.1)!important;margin:8px!important}
+.leaflet-control-zoom a{width:32px!important;height:32px!important;line-height:32px!important;
+  background:white!important;color:var(--ink)!important;font-size:14px!important;border:none!important}
+
+/* user dot */
+.u-dot{width:12px;height:12px;border-radius:50%;background:var(--blue);
+  border:2px solid white;box-shadow:0 0 0 3px rgba(0,122,255,.18)}
+
+/* compass cone overlay (SVG, inside map-card) */
+#cone-svg{position:absolute;inset:0;pointer-events:none;z-index:100;
+  width:100%;height:100%}
+
+/* orbs — positioned in map-zone coordinate space (includes margin) */
+#orbit-layer{position:absolute;inset:0;z-index:200;pointer-events:none}
+.orb{
+  position:absolute;transform:translate(-50%,-50%);
+  border-radius:50%;background:white;
+  display:flex;align-items:center;justify-content:center;
+  cursor:pointer;pointer-events:all;
+  box-shadow:0 2px 10px rgba(0,0,0,.15),0 0 0 1.5px rgba(0,0,0,.06);
+  transition:opacity .35s;line-height:1;
+  border:2px solid white;
+}
+.orb.sel{box-shadow:0 0 0 2.5px var(--blue),0 3px 14px rgba(0,122,255,.28)!important}
+.orb-lbl{
+  position:absolute;transform:translateX(-50%);
+  font-size:8px;font-weight:600;color:var(--ink2);
+  background:rgba(255,255,255,.92);padding:1px 5px;
+  border-radius:6px;pointer-events:none;white-space:nowrap;
+  box-shadow:0 1px 3px rgba(0,0,0,.08);
+}
+
+/* locate + sim buttons */
+#map-btns{position:absolute;top:calc(var(--map-margin) + 8px);right:calc(var(--map-margin) + 8px); z-index: 999999;
+  z-index:300;display:flex;flex-direction:column;gap:6px}
+.map-btn{width:34px;height:34px;border-radius:50%;background:white;
+  box-shadow:0 2px 8px rgba(0,0,0,.12);
+  display:flex;align-items:center;justify-content:center;
+  font-size:15px;cursor:pointer;border:none;transition:transform .15s}
+.map-btn:active{transform:scale(.9)}
+.map-btn.sim-on{background:var(--ink);color:white}
+
+/* route bar inside map-card */
+#route-bar{position:absolute;bottom:8px;left:8px;right:8px;z-index:300;
+  background:white;border-radius:11px;padding:9px 12px;
+  box-shadow:0 2px 12px rgba(0,0,0,.1);display:none}
+.rb-row{display:flex;align-items:center;justify-content:space-between;margin-bottom:6px}
+.rb-dest{font-size:11px;font-weight:600;display:flex;align-items:center;gap:4px}
+.rb-cancel{font-size:11px;color:var(--blue);background:none;border:none;
+  cursor:pointer;font-family:'DM Sans',sans-serif}
+.rb-track{height:2.5px;background:var(--off2);border-radius:2px;overflow:hidden}
+.rb-fill{height:100%;background:var(--blue);border-radius:2px;transition:width .5s ease;width:0%}
+.rb-stats{display:flex;gap:12px;margin-top:6px}
+.rb-stat{font-size:9px;color:var(--ink2)}
+.rb-stat strong{color:var(--ink);font-weight:600}
+
+/* map pins */
+.mp2{display:flex;flex-direction:column;align-items:center;gap:2px;cursor:pointer}
+.mpb{width:28px;height:28px;border-radius:50%;background:white;
+  box-shadow:0 2px 8px rgba(0,0,0,.12),0 0 0 1px rgba(0,0,0,.05);
+  display:flex;align-items:center;justify-content:center;font-size:13px;transition:all .2s}
+.mp2.sel .mpb{background:var(--ink);transform:scale(1.15);box-shadow:0 4px 14px rgba(0,0,0,.2)}
+.mp2.sel .mpb span{filter:invert(1)}
+.mpd{width:3px;height:3px;border-radius:50%;background:rgba(0,0,0,.18)}
+.mp2.sel .mpd{background:var(--ink)}
+.dest-pin{display:flex;flex-direction:column;align-items:center;gap:2px}
+.dest-flag{width:24px;height:24px;border-radius:6px;background:var(--ink);
+  display:flex;align-items:center;justify-content:center;font-size:12px;
+  box-shadow:0 2px 8px rgba(0,0,0,.18)}
+.dest-d{width:3px;height:3px;border-radius:50%;background:var(--ink)}
+
+/* ── TIMELINE ── */
+#tl-section{flex:1;overflow:hidden;position:relative;display:flex;flex-direction:column;
+  background:var(--white)}
+#tl-scroll{flex:1;overflow-y:auto;padding:12px 16px calc(var(--safe-bot)+88px);
+  scroll-behavior:smooth;scrollbar-width:none}
+#tl-scroll::-webkit-scrollbar{display:none}
+.tl-e{display:flex;gap:11px;position:relative}
+.tl-l{display:flex;flex-direction:column;align-items:center;flex-shrink:0;width:32px}
+.tl-ic{width:30px;height:30px;border-radius:50%;background:var(--off);
+  display:flex;align-items:center;justify-content:center;font-size:14px;
+  border:1.5px solid var(--border);position:relative;z-index:1;transition:all .3s}
+.tl-ic.cur{background:var(--ink);border-color:var(--ink);box-shadow:0 3px 10px rgba(0,0,0,.15)}
+.tl-ic.cur span{filter:invert(1)}
+.tl-ic.fut{opacity:.45}
+.tl-ln{flex:1;width:1.5px;background:var(--border);margin:2px 0;min-height:14px}
+.tl-ln.dash{background:repeating-linear-gradient(to bottom,var(--border) 0,var(--border) 4px,transparent 4px,transparent 8px)}
+.tl-b{flex:1;padding-bottom:16px}
+.tl-t{font-size:9px;color:var(--ink3);letter-spacing:.04em;margin-bottom:2px}
+.tl-title{font-family:'DM Serif Display',serif;font-size:15px;color:var(--ink);
+  line-height:1.25;margin-bottom:4px;letter-spacing:-.01em}
+.tl-txt{font-size:12px;line-height:1.65;color:var(--ink2);font-weight:300}
+.tl-dist{display:inline-flex;align-items:center;gap:3px;margin-top:5px;
+  font-size:10px;font-weight:500;color:var(--blue);background:rgba(0,122,255,.07);
+  padding:2px 8px;border-radius:20px}
+.dir-chip{display:inline-flex;align-items:center;gap:4px;font-size:10px;font-weight:600;
+  color:var(--ink2);background:var(--off);padding:3px 8px;border-radius:20px;margin-top:4px}
+
+/* ── BIFORK ── */
+#bifork{position:absolute;bottom:0;left:0;right:0;z-index:500;background:white;
+  border-radius:18px 18px 0 0;box-shadow:0 -4px 28px rgba(0,0,0,.12);
+  padding:14px 16px calc(var(--safe-bot)+14px);
+  transform:translateY(100%);transition:transform .35s cubic-bezier(.4,0,.2,1)}
+#bifork.vis{transform:translateY(0)}
+.bif-hdr{text-align:center;margin-bottom:12px}
+.bif-lbl{font-size:10px;font-weight:600;color:var(--ink3);letter-spacing:.06em;text-transform:uppercase;margin-bottom:3px}
+.bif-q{font-family:'DM Serif Display',serif;font-size:16px;color:var(--ink)}
+.bif-choices{display:flex;gap:10px}
+.bif-card{flex:1;border:1.5px solid var(--border);border-radius:13px;padding:11px;
+  cursor:pointer;transition:all .2s;display:flex;flex-direction:column;gap:4px}
+.bif-card:active{transform:scale(.97)}
+.bif-card.chosen{border-color:var(--blue);background:rgba(0,122,255,.04)}
+@keyframes swL{to{transform:translateX(-130%) rotate(-8deg);opacity:0}}
+@keyframes swR{to{transform:translateX(130%) rotate(8deg);opacity:0}}
+.bif-card.aL{animation:swL .3s ease forwards}
+.bif-card.aR{animation:swR .3s ease forwards}
+.bc-ico{font-size:22px}.bc-nm{font-family:'DM Serif Display',serif;font-size:13px;color:var(--ink);line-height:1.2}
+.bc-cat{font-size:9px;color:var(--ink3);font-weight:600;text-transform:uppercase;letter-spacing:.03em}
+.bc-dst{font-size:10px;color:var(--blue);font-weight:500}
+.bif-skip{text-align:center;margin-top:10px;font-size:12px;color:var(--ink3);cursor:pointer}
+
+/* ── GPS overlay ── */
+#gps-overlay{position:fixed;inset:0;z-index:999;background:white;
+  display:flex;flex-direction:column;align-items:center;justify-content:center;
+  gap:18px;padding:48px 32px;text-align:center}
+.go-ico{width:62px;height:62px;border-radius:18px;background:var(--off);
+  display:flex;align-items:center;justify-content:center;font-size:30px}
+.go-title{font-family:'DM Serif Display',serif;font-size:24px;letter-spacing:-.02em}
+.go-sub{font-size:13px;color:var(--ink2);line-height:1.65;font-weight:300;max-width:260px}
+.go-btn{width:100%;max-width:260px;padding:14px;border-radius:12px;background:var(--ink);
+  color:white;font-family:'DM Sans',sans-serif;font-size:14px;font-weight:500;
+  border:none;cursor:pointer;transition:opacity .15s}
+.go-btn:active,.go-btn:hover{opacity:.85}
+.go-skip{font-size:12px;color:var(--ink3);cursor:pointer;text-decoration:underline;text-underline-offset:2px}
+@keyframes shimmer{0%{background-position:-200% 0}100%{background-position:200% 0}}
+.shim{background:linear-gradient(90deg,var(--off) 25%,var(--off2) 50%,var(--off) 75%);
+  background-size:200% 100%;animation:shimmer 1.4s infinite}
+</style>
+</head>
+<body>
+<div id="app">
+
+  <!-- TOPBAR -->
+  <div id="topbar">
+    <div class="tb1">
+      <div class="logo">locus</div>
+      <div class="mode-pills">
+        <button class="mp on" id="pill-e" onclick="setMode('explore')">Esplora</button>
+        <button class="mp" id="pill-n" onclick="setMode('navigate')">Naviga</button>
+      </div>
+    </div>
+    <div id="filter-bar">
+      <div class="fc on" data-cat="all" onclick="toggleF(this,'all')">🗺️ Tutti</div>
+      <div class="fc" data-cat="monument" onclick="toggleF(this,'monument')">🏛️ Monumenti</div>
+      <div class="fc" data-cat="food" onclick="toggleF(this,'food')">🍽️ Cucina</div>
+      <div class="fc" data-cat="art" onclick="toggleF(this,'art')">🎨 Arte</div>
+      <div class="fc" data-cat="nature" onclick="toggleF(this,'nature')">🌿 Natura</div>
+      <div class="fc" data-cat="shop" onclick="toggleF(this,'shop')">🛍️ Shopping</div>
+    </div>
+    <div id="nav-search">
+      <div class="sw">
+        <span style="font-size:13px;opacity:.35">🔍</span>
+        <input class="si" id="si" placeholder="Dove vuoi andare?" autocomplete="off" autocorrect="off" spellcheck="false">
+        <button style="background:none;border:none;color:var(--ink3);font-size:14px;cursor:pointer" onclick="clearSrch()">✕</button>
+      </div>
+      <div id="sugg"></div>
+    </div>
+  </div>
+
+  <!-- MAP ZONE (padded so orbs are visible) -->
+  <div id="map-zone">
+    <div id="map-card">
+      <div id="map"></div>
+      <!-- compass cone drawn here -->
+      <svg id="cone-svg" xmlns="http://www.w3.org/2000/svg"><defs>
+        <radialGradient id="coneGrad" cx="50%" cy="100%" r="100%">
+          <stop offset="0%" stop-color="#007AFF" stop-opacity="0.22"/>
+          <stop offset="100%" stop-color="#007AFF" stop-opacity="0"/>
+        </radialGradient>
+      </defs><polygon id="cone-poly" fill="url(#coneGrad)"/></svg>
+      <div id="route-bar">
+        <div class="rb-row">
+          <div class="rb-dest">🏁 <span id="rb-dn">—</span></div>
+          <button class="rb-cancel" onclick="cancelRoute()">✕ Annulla</button>
+        </div>
+        <div class="rb-track"><div class="rb-fill" id="rb-fill"></div></div>
+        <div class="rb-stats">
+          <div class="rb-stat">🦶 <strong id="rb-dist">—</strong></div>
+          <div class="rb-stat">⏱ <strong id="rb-time">—</strong></div>
+          <div class="rb-stat">📍 <strong id="rb-poi">—</strong> tappe</div>
+        </div>
+      </div>
+    </div>
+    <!-- orbs live here, in the margin -->
+    <div id="orbit-layer"></div>
+    <!-- buttons top-right inside zone but outside card -->
+    <div id="map-btns">
+      <button class="map-btn" onclick="centerUser()" title="Centrati">📍</button>
+      <button class="map-btn" id="sim-btn" onclick="toggleSim()" title="Simula passeggiata">🚶</button>
+    </div>
+  </div>
+
+  <!-- TIMELINE -->
+  <div id="tl-section">
+    <div id="tl-scroll"></div>
+    <div id="bifork">
+      <div class="bif-hdr">
+        <div class="bif-lbl">Bivio — scegli dove andare</div>
+        <div class="bif-q" id="bif-q">Cosa ti incuriosisce di più?</div>
+      </div>
+      <div class="bif-choices" id="bif-choices"></div>
+      <div class="bif-skip" onclick="dismissBif()">Continua dritto →</div>
+    </div>
+  </div>
+</div>
+
+<!-- GPS OVERLAY -->
+<div id="gps-overlay">
+  <div class="go-ico">🗺️</div>
+  <div class="go-title">Ciao, esploratore.</div>
+  <div class="go-sub">Locus ti guida tra le storie del posto — anche senza una meta.</div>
+  <button class="go-btn" onclick="requestGPS()">Attiva posizione</button>
+  <span class="go-skip" onclick="useDemo()">Demo — Roma centro</span>
+</div>
+
+<script>
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+// DATA
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+const ORS_KEY = '';
+const PD = [
+  {id:1,name:'Piazza Navona',cat:'monument',emoji:'🏛️',lo:.0022,ln:.0012,
+   text:'Costruita sullo stadio di Domiziano nel I sec. d.C. La Fontana dei Quattro Fiumi di Bernini al centro è un capolavoro di teatralità barocca.'},
+  {id:2,name:'Trattoria da Enzo',cat:'food',emoji:'🍽️',lo:-.0013,ln:.0025,
+   text:'Cucina romana autentica dal 1962. La carbonara ancora con guanciale e pecorino, senza panna. La fila fuori è lunga — e giusta.'},
+  {id:3,name:'Pantheon',cat:'monument',emoji:'⛩️',lo:.0035,ln:-.0014,
+   text:"L'oculus è aperto alla pioggia. In 2000 anni nessuno ha trovato un sistema migliore — il pavimento convesso drena tutto da solo."},
+  {id:4,name:'Galleria Doria Pamphilj',cat:'art',emoji:'🎨',lo:.0028,ln:.0038,
+   text:'Ancora di proprietà della famiglia. Il ritratto di Innocenzo X del Velázquez — il pittore stesso lo considerava il suo capolavoro.'},
+  {id:5,name:"Giardini dell'Arancio",cat:'nature',emoji:'🌿',lo:-.0048,ln:.0015,
+   text:'Il belvedere più bello di Roma che nessuno conosce. Il terrazzino al tramonto vale venti minuti di deviazione.'},
+  {id:6,name:"Campo de' Fiori",cat:'monument',emoji:'🌸',lo:-.0025,ln:-.0028,
+   text:'Di mattina mercato, di sera aperitivi. Giordano Bruno al centro fu bruciato qui nel 1600. Una piazza che non ha mai smesso di essere viva.'},
+  {id:7,name:'Bar San Calisto',cat:'food',emoji:'☕',lo:-.0035,ln:-.001,
+   text:'Il bar preferito di Trastevere. Caffè a 1 euro, tavolini fuori, la sensazione di aver trovato il posto giusto.'},
+  {id:8,name:'Basilica di Santa Maria',cat:'monument',emoji:'⛪',lo:-.002,ln:-.0038,
+   text:'Una delle basiliche più antiche di Roma. I mosaici del XII secolo sono tra le cose più belle che puoi vedere senza fila.'},
+];
+const CATS={monument:'Monumento',food:'Cucina',art:'Arte',nature:'Natura',shop:'Shopping'};
+const DIRS=['↑','↗','→','↘','↓','↙','←','↖'];
+const DLBL=['nord','nord-est','est','sud-est','sud','sud-ovest','ovest','nord-ovest'];
+const NARS=[
+  'Sei nel cuore della città storica. Ogni vicolo ha almeno due secoli di storie.',
+  'La luce di quest\'ora trasforma i palazzi. Perfetto per perdersi senza fretta.',
+  'Stai camminando su strati di storia — sotto i sampietrini c\'è la Roma antica.',
+  'Questo quartiere è cambiato poco negli ultimi cent\'anni. Osserva i portoni.',
+  'Il profumo di caffè dall\'angolo — in Italia è sempre un buon segnale.',
+];
+
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+// STATE
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+let map, uMark, rLayer, dMark, pLayers = {};
+let uPos = null, places = [], selId = null;
+let mode = 'explore', filters = new Set(['all']);
+let heading = 0; // degrees, 0=north
+let rData = null, simNavI = null, simNavP = 0;
+let tlEntries = [], bifVis = false, bifDism = false, lastBif = 0;
+let headSimI = null; // slow heading rotation for demo
+let walkSimI = null, walkSimRunning = false, walkSimIdx = 0, walkSimPath = [];
+
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+// MAP
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+function initMap(lat, lng) {
+  if (map) { map.setView([lat, lng], 16); return; }
+  map = L.map('map', { zoomControl: true, attributionControl: false }).setView([lat, lng], 16);
+  L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', { maxZoom: 19 }).addTo(map);
+  map.on('click', onMapClick);
+}
+function placeUser(lat, lng) {
+  const ic = L.divIcon({ className: '', html: '<div class="u-dot"></div>', iconSize: [12, 12], iconAnchor: [6, 6] });
+  if (uMark) { uMark.setLatLng([lat, lng]); return; }
+  uMark = L.marker([lat, lng], { icon: ic, zIndexOffset: 999 }).addTo(map);
+}
+function centerUser() { if (uPos && map) map.flyTo([uPos.lat, uPos.lng], 16, { duration: .8 }); }
+
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+// COMPASS CONE
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+function updateCone() {
+  if (!map || !uPos) return;
+  const card = document.getElementById('map-card');
+  const W = card.offsetWidth, H = card.offsetHeight;
+
+  // user pixel position on map
+  const pt = map.latLngToContainerPoint([uPos.lat, uPos.lng]);
+  const cx = pt.x, cy = pt.y;
+
+  // cone parameters
+  const coneAngle = 50; // degrees half-width
+  const coneLen = Math.max(W, H) * 1.2;
+  const leftDeg = heading - coneAngle;
+  const rightDeg = heading + coneAngle;
+  const lRad = (leftDeg - 90) * Math.PI / 180;
+  const rRad = (rightDeg - 90) * Math.PI / 180;
+  // heading points "up" = north, but screen 0deg = right, so subtract 90
+  const lx = cx + Math.cos(lRad) * coneLen;
+  const ly = cy + Math.sin(lRad) * coneLen;
+  const rx = cx + Math.cos(rRad) * coneLen;
+  const ry = cy + Math.sin(rRad) * coneLen;
+
+  document.getElementById('cone-poly').setAttribute('points', `${cx},${cy} ${lx},${ly} ${rx},${ry}`);
+  // update gradient center to user pos
+  const gx = ((cx / W) * 100).toFixed(1) + '%';
+  const gy = ((cy / H) * 100).toFixed(1) + '%';
+  const grad = document.getElementById('coneGrad');
+  grad.setAttribute('cx', gx);
+  grad.setAttribute('cy', gy);
+}
+
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+// GPS + ORIENTATION
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+function requestGPS() {
+  if (!navigator.geolocation) { useDemo(); return; }
+  navigator.geolocation.getCurrentPosition(
+    p => setPos(p.coords.latitude, p.coords.longitude, false),
+    () => useDemo(), { enableHighAccuracy: true, timeout: 12000 });
+  navigator.geolocation.watchPosition(p => {
+    const { latitude: lat, longitude: lng, heading: h } = p.coords;
+    uPos = { lat, lng, _r: true };
+    if (h !== null && h !== undefined) { heading = h; }
+    placeUser(lat, lng);
+    updateCone(); renderOrbs();
+    if (mode === 'navigate' && rData) updateNav();
+  }, () => {}, { enableHighAccuracy: true });
+
+  // Request compass — must be called from a user gesture
+  requestCompass();
+}
+
+function requestCompass() {
+  if (typeof DeviceOrientationEvent !== 'undefined' &&
+      typeof DeviceOrientationEvent.requestPermission === 'function') {
+    // iOS 13+ — must ask
+    DeviceOrientationEvent.requestPermission()
+      .then(state => {
+        if (state === 'granted') {
+          window.addEventListener('deviceorientationabsolute', onOrient, true);
+          window.addEventListener('deviceorientation', onOrient, true);
+        }
+      }).catch(() => {});
+  } else {
+    // Android / desktop
+    window.addEventListener('deviceorientationabsolute', onOrient, true);
+    window.addEventListener('deviceorientation', onOrient, true);
+  }
+}
+
+function onOrient(e) {
+  const a = e.webkitCompassHeading != null ? e.webkitCompassHeading : (e.alpha ? (360 - e.alpha) : null);
+  if (a !== null) { heading = a; updateCone(); renderOrbs(); }
+}
+
+function useDemo() { setPos(41.8986, 12.4769, true); }
+
+function setPos(lat, lng, demo) {
+  uPos = { lat, lng };
+  document.getElementById('gps-overlay').style.display = 'none';
+  initMap(lat, lng);
+  placeUser(lat, lng);
+  loadPlaces(lat, lng);
+  startHeadSim();
+  // after map renders, draw cone
+  setTimeout(() => { updateCone(); renderOrbs(); }, 300);
+  // listen for map move/zoom to keep cone in sync
+  if (map) {
+    map.on('move zoom', () => { updateCone(); renderOrbs(); });
+  }
+}
+
+function startHeadSim() {
+  if (headSimI) clearInterval(headSimI);
+  headSimI = setInterval(() => {
+    if (!uPos?._r) {
+      heading = (heading + 0.6) % 360;
+      updateCone();
+      renderOrbs();
+      checkBif();
+    }
+  }, 80);
+}
+
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+// WALK SIMULATION
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+function buildWalkPath() {
+  // Visit POIs in distance order, weaving a path
+  const sorted = [...places].sort((a, b) => a.dist - b.dist);
+  const path = [{ lat: uPos.lat, lng: uPos.lng }];
+  sorted.forEach(p => {
+    // interpolate a few steps toward each POI
+    const prev = path[path.length - 1];
+    const steps = 8;
+    for (let i = 1; i <= steps; i++) {
+      const t = i / steps;
+      const jitter = Math.sin(t * Math.PI) * 0.0003;
+      path.push({
+        lat: prev.lat + (p.lat - prev.lat) * t + jitter * (Math.random() - .5),
+        lng: prev.lng + (p.lon - prev.lng) * t + jitter * (Math.random() - .5),
+      });
+    }
+  });
+  return path;
+}
+
+function toggleSim() {
+  if (walkSimRunning) {
+    stopWalkSim();
+  } else {
+    startWalkSim();
+  }
+}
+
+function startWalkSim() {
+  if (!uPos) return;
+  walkSimPath = buildWalkPath();
+  walkSimIdx = 0;
+  walkSimRunning = true;
+  document.getElementById('sim-btn').classList.add('sim-on');
+  document.getElementById('sim-btn').textContent = '⏹';
+
+  walkSimI = setInterval(() => {
+    if (walkSimIdx >= walkSimPath.length) {
+      stopWalkSim(); return;
+    }
+    const pt = walkSimPath[walkSimIdx];
+    // compute heading from previous point
+    if (walkSimIdx > 0) {
+      const prev = walkSimPath[walkSimIdx - 1];
+      heading = brng(prev.lat, prev.lng, pt.lat, pt.lng);
+    }
+    uPos.lat = pt.lat; uPos.lng = pt.lng;
+    placeUser(pt.lat, pt.lng);
+    updateCone();
+    renderOrbs();
+    buildTL();
+    checkBif();
+    // gentle map follow
+    if (walkSimIdx % 5 === 0) map.panTo([pt.lat, pt.lng], { animate: true, duration: .8 });
+    walkSimIdx++;
+  }, 600); // one step every 600ms
+}
+
+function stopWalkSim() {
+  clearInterval(walkSimI);
+  walkSimRunning = false;
+  document.getElementById('sim-btn').classList.remove('sim-on');
+  document.getElementById('sim-btn').textContent = '🚶';
+}
+
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+// PLACES
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+function loadPlaces(lat, lng) {
+  places = PD.map(p => ({
+    ...p,
+    lat: lat + p.lo, lon: lng + p.ln,
+    dist: Math.round(hav(lat, lng, lat + p.lo, lng + p.ln))
+  })).sort((a, b) => a.dist - b.dist);
+  renderPins([]); renderOrbs(); buildTL();
+}
+function vp() { return places.filter(p => filters.has('all') || filters.has(p.cat)); }
+
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+// FILTER
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+function toggleF(el, cat) {
+  if (cat === 'all') {
+    filters = new Set(['all']);
+    document.querySelectorAll('.fc').forEach(c => c.classList.remove('on'));
+    el.classList.add('on');
+  } else {
+    document.querySelector('[data-cat="all"]').classList.remove('on');
+    filters.delete('all');
+    if (el.classList.contains('on')) {
+      el.classList.remove('on'); filters.delete(cat);
+      if (!filters.size) { filters.add('all'); document.querySelector('[data-cat="all"]').classList.add('on'); }
+    } else { el.classList.add('on'); filters.add(cat); }
+  }
+  renderPins(rData ? rData.pois.map(p => p.id) : []);
+  renderOrbs(); buildTL();
+}
+
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+// ORBIT RENDERING
+// The map-zone is padded; orbs are placed in zone coords.
+// Map card starts at (margin, margin) inside zone.
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+function renderOrbs() {
+  if (!uPos || !map) return;
+  const zone = document.getElementById('map-zone');
+  const card = document.getElementById('map-card');
+  const ZW = zone.offsetWidth, ZH = zone.offsetHeight;
+  const margin = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--map-margin')) || 44;
+  const CW = card.offsetWidth, CH = card.offsetHeight;
+  // center of zone
+  const ZCX = ZW / 2, ZCY = ZH / 2;
+
+  const visible = vp();
+  if (!visible.length) { document.getElementById('orbit-layer').innerHTML = ''; return; }
+
+  const dists = visible.map(p => p.dist);
+  const mx = Math.max(...dists, 1), mn = Math.min(...dists, 1);
+  const layer = document.getElementById('orbit-layer');
+  layer.innerHTML = '';
+  const sortedByDist = [...visible].sort((a, b) => a.dist - b.dist);
+
+  visible.forEach(p => {
+    const bear = brng(uPos.lat, uPos.lng, p.lat, p.lon);
+    const rel = ((bear - heading) + 360) % 360;
+    const norm = 1 - ((p.dist - mn) / (mx - mn + 1));
+    const sz = Math.round(24 + norm * 22); // 24–46px
+
+    // Place on the border of the full zone rectangle
+    const { x, y } = borderPt(ZCX, ZCY, ZW, ZH, rel, sz / 2 + 4);
+
+    const orb = document.createElement('div');
+    orb.className = 'orb' + (p.id === selId ? ' sel' : '');
+    orb.style.cssText = `left:${x}px;top:${y}px;width:${sz}px;height:${sz}px;` +
+      `font-size:${Math.round(sz * .47)}px;opacity:${.45 + norm * .55}`;
+    orb.textContent = p.emoji;
+    orb.onclick = () => selPOI(p.id);
+    layer.appendChild(orb);
+
+    // label for 3 closest
+    if (sortedByDist.indexOf(p) < 3) {
+      const lbl = document.createElement('div');
+      lbl.className = 'orb-lbl';
+      lbl.style.cssText = `left:${x}px;top:${y + sz / 2 + 5}px`;
+      lbl.textContent = fmt(p.dist);
+      layer.appendChild(lbl);
+    }
+  });
+}
+
+function borderPt(cx, cy, W, H, angleDeg, padding) {
+  const a = angleDeg * Math.PI / 180;
+  const dx = Math.sin(a), dy = -Math.cos(a);
+  const pw = W / 2 - padding, ph = H / 2 - padding;
+  const t = Math.abs(dx) < 1e-9 ? ph / Math.abs(dy) :
+            Math.abs(dy) < 1e-9 ? pw / Math.abs(dx) :
+            Math.min(pw / Math.abs(dx), ph / Math.abs(dy));
+  return { x: cx + dx * t, y: cy + dy * t };
+}
+
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+// MAP PINS
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+function renderPins(onRoute) {
+  Object.values(pLayers).forEach(l => map.removeLayer(l));
+  pLayers = {};
+  vp().forEach(p => {
+    const html = `<div class="mp2${p.id === selId ? ' sel' : ''}" id="pin-${p.id}">
+      <div class="mpb"><span>${p.emoji}</span></div><div class="mpd"></div></div>`;
+    const ic = L.divIcon({ className: '', html, iconSize: [28, 38], iconAnchor: [14, 38] });
+    const m = L.marker([p.lat, p.lon], { icon: ic }).addTo(map);
+    m.on('click', () => selPOI(p.id));
+    pLayers[p.id] = m;
+  });
+}
+
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+// TIMELINE
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+function buildTL() {
+  const sorted = [...vp()].sort((a, b) => a.dist - b.dist);
+  tlEntries = [{ type: 'cur', emoji: '📍', time: nt(), title: 'Dove sei adesso',
+    text: NARS[Math.floor(Math.random() * NARS.length)] }];
+  sorted.slice(0, 5).forEach((p, i) => {
+    const bear = uPos ? brng(uPos.lat, uPos.lng, p.lat, p.lon) : 0;
+    const rel = ((bear - heading) + 360) % 360;
+    const di = Math.round(rel / 45) % 8;
+    tlEntries.push({ type: i === 0 ? 'nxt' : 'fut', poi: p, emoji: p.emoji,
+      time: am(nt(), Math.round(p.dist / 80)), title: p.name, text: p.text,
+      dist: p.dist, dir: DIRS[di], dirLbl: DLBL[di] });
+  });
+  renderTL();
+}
+function renderTL() {
+  document.getElementById('tl-scroll').innerHTML = tlEntries.map((e, i) => {
+    const last = i === tlEntries.length - 1;
+    return `<div class="tl-e">
+      <div class="tl-l">
+        <div class="tl-ic${e.type==='cur'?' cur':e.type==='fut'?' fut':''}"><span>${e.emoji}</span></div>
+        ${!last ? `<div class="tl-ln${e.type==='fut'?' dash':''}"></div>` : ''}
+      </div>
+      <div class="tl-b">
+        <div class="tl-t">${e.time}</div>
+        <div class="tl-title">${e.title}</div>
+        <div class="tl-txt">${e.text}</div>
+        ${e.dist ? `<div class="tl-dist">${e.dir} · ${fmt(e.dist)}</div>` : ''}
+        ${e.type === 'nxt' ? `<div class="dir-chip">Vai verso ${e.dirLbl} ${e.dir}</div>` : ''}
+      </div></div>`;
+  }).join('');
+}
+function pushTL(poi) {
+  tlEntries.unshift({ type: 'cur', emoji: poi.emoji, time: nt(), title: poi.name, text: poi.text });
+  renderTL();
+  document.getElementById('tl-scroll').scrollTo({ top: 0, behavior: 'smooth' });
+}
+
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+// BIFORK
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+function checkBif() {
+  if (bifVis || bifDism) return;
+  if (Date.now() - lastBif < 14000) return;
+  const v = [...vp()].sort((a, b) => a.dist - b.dist);
+  if (v.length < 2) return;
+  const [a, b] = v;
+  if (Math.abs(a.dist - b.dist) > 140) return;
+  const ba = brng(uPos.lat, uPos.lng, a.lat, a.lon);
+  const bb = brng(uPos.lat, uPos.lng, b.lat, b.lon);
+  let diff = Math.abs(ba - bb); if (diff > 180) diff = 360 - diff;
+  if (diff < 45) return;
+  showBif(a, b);
+}
+function showBif(a, b) {
+  bifVis = true; lastBif = Date.now();
+  document.getElementById('bif-choices').innerHTML = [a, b].map((p, i) => `
+    <div class="bif-card" id="bc-${i}" onclick="chBif(${p.id},${i})">
+      <div class="bc-ico">${p.emoji}</div>
+      <div class="bc-nm">${p.name}</div>
+      <div class="bc-cat">${CATS[p.cat] || p.cat}</div>
+      <div class="bc-dst">${fmt(p.dist)}</div>
+    </div>`).join('');
+  document.getElementById('bifork').classList.add('vis');
+  [0, 1].forEach(i => {
+    setupSwipe(document.getElementById(`bc-${i}`), () => chBif(i === 0 ? a.id : b.id, i));
+  });
+}
+function chBif(id, idx) {
+  document.getElementById(`bc-${idx}`).classList.add('chosen');
+  setTimeout(() => { dismissBif(); selPOI(id); const p = places.find(x => x.id === id); if (p) pushTL(p); }, 300);
+}
+function dismissBif() {
+  document.getElementById('bifork').classList.remove('vis');
+  bifVis = false; bifDism = true;
+  setTimeout(() => { bifDism = false; }, 18000);
+}
+function setupSwipe(el, cb) {
+  let sx = 0;
+  el.addEventListener('touchstart', e => { sx = e.touches[0].clientX; }, { passive: true });
+  el.addEventListener('touchend', e => { if (Math.abs(e.changedTouches[0].clientX - sx) > 50) cb(); }, { passive: true });
+}
+
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+// SELECT
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+function selPOI(id) {
+  selId = id; renderOrbs();
+  document.querySelectorAll('.mp2').forEach(e => e.classList.remove('sel'));
+  document.querySelector(`#pin-${id}`)?.classList.add('sel');
+  const p = places.find(x => x.id === id);
+  if (p && map) map.panTo([p.lat, p.lon], { animate: true, duration: .5 });
+}
+
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+// MODE
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+function setMode(m) {
+  mode = m;
+  document.getElementById('pill-e').classList.toggle('on', m === 'explore');
+  document.getElementById('pill-n').classList.toggle('on', m === 'navigate');
+  document.getElementById('nav-search').style.display = m === 'navigate' ? 'block' : 'none';
+  if (m === 'explore') { if (rData) cancelRoute(true); document.getElementById('route-bar').style.display = 'none'; }
+  else setTimeout(() => document.getElementById('si').focus(), 100);
+}
+
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+// SEARCH
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+let st;
+document.getElementById('si').addEventListener('input', e => {
+  const v = e.target.value.trim(); clearTimeout(st);
+  if (v.length < 2) { hideSug(); return; }
+  st = setTimeout(() => geocode(v), 320);
+});
+document.getElementById('si').addEventListener('keydown', e => {
+  if (e.key === 'Enter') { const v = e.target.value.trim(); if (v) geocode(v, true); }
+});
+async function geocode(q, imm = false) {
+  const dm = [
+    { name: 'Colosseo', lat: 41.8902, lng: 12.4922 }, { name: 'Vaticano', lat: 41.9022, lng: 12.4539 },
+    { name: 'Trastevere', lat: 41.8895, lng: 12.4697 }, { name: 'Piazza di Spagna', lat: 41.9058, lng: 12.4823 },
+    { name: 'Termini', lat: 41.9009, lng: 12.5005 }, { name: 'Testaccio', lat: 41.8776, lng: 12.4772 },
+  ];
+  const mt = dm.filter(d => d.name.toLowerCase().includes(q.toLowerCase()));
+  if (mt.length) { if (imm && mt.length === 1) { startNav(mt[0]); return; } showSug(mt); return; }
+  try {
+    const r = await fetch(`https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(q)}&format=json&limit=4&countrycodes=it`, { headers: { 'Accept-Language': 'it' } });
+    const d = await r.json();
+    const res = d.map(x => ({ name: x.display_name.split(',')[0], sub: x.display_name.split(',').slice(1, 3).join(',').trim(), lat: parseFloat(x.lat), lng: parseFloat(x.lon) }));
+    if (imm && res.length === 1) { startNav(res[0]); hideSug(); return; }
+    showSug(res);
+  } catch { hideSug(); }
+}
+function showSug(l) {
+  document.getElementById('sugg').innerHTML = l.map(r => `<div class="sg" onclick='startNav(${JSON.stringify(r)})'>
+    <span style="opacity:.35">📍</span>
+    <div><div style="font-weight:500">${r.name}</div>${r.sub ? `<div style="font-size:11px;color:var(--ink3)">${r.sub}</div>` : ''}</div>
+  </div>`).join('');
+  document.getElementById('sugg').style.display = 'block';
+}
+function hideSug() { document.getElementById('sugg').style.display = 'none'; }
+function clearSrch() { document.getElementById('si').value = ''; hideSug(); }
+function onMapClick(e) { if (mode !== 'navigate') return; startNav({ name: 'Punto sulla mappa', lat: e.latlng.lat, lng: e.latlng.lng }); }
+
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+// NAVIGATION
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+async function startNav(dest) {
+  hideSug(); clearSrch();
+  document.getElementById('route-bar').style.display = 'block';
+  document.getElementById('rb-dn').textContent = dest.name;
+  if (dMark) map.removeLayer(dMark);
+  const di = L.divIcon({ className: '', html: `<div class="dest-pin"><div class="dest-flag">🏁</div><div class="dest-d"></div></div>`, iconSize: [24, 32], iconAnchor: [12, 32] });
+  dMark = L.marker([dest.lat, dest.lng], { icon: di, zIndexOffset: 500 }).addTo(map);
+  let coords; if (ORS_KEY) coords = await fetchORS(uPos.lat, uPos.lng, dest.lat, dest.lng);
+  if (!coords) coords = simRoute(uPos.lat, uPos.lng, dest.lat, dest.lng);
+  if (rLayer) map.removeLayer(rLayer);
+  rLayer = L.polyline(coords, { color: '#007AFF', weight: 4, opacity: .6, lineCap: 'round', lineJoin: 'round' }).addTo(map);
+  map.fitBounds(rLayer.getBounds(), { padding: [60, 60] });
+  const along = findAlong(coords);
+  const td = rLen(coords), tm = Math.round(td / 80);
+  document.getElementById('rb-dist').textContent = fmt(td);
+  document.getElementById('rb-time').textContent = tm < 60 ? `${tm} min` : `${Math.floor(tm / 60)}h ${tm % 60}m`;
+  document.getElementById('rb-poi').textContent = along.length;
+  rData = { dest, coords, pois: along, td };
+  renderPins(along.map(p => p.id));
+  buildTLnav(along); startNavSim(td);
+}
+function buildTLnav(along) {
+  tlEntries = [{ type: 'cur', emoji: '📍', time: nt(), title: 'Inizio percorso', text: 'Stai per partire. Le tappe ti aspettano.' }];
+  along.forEach((p, i) => {
+    tlEntries.push({ type: i === 0 ? 'nxt' : 'fut', poi: p, emoji: p.emoji,
+      time: am(nt(), Math.round((p._ri / (rData?.coords.length || 1)) * (rData?.td || 1000) / 80)),
+      title: p.name, text: p.text, dist: p._rd, dir: '→' });
+  });
+  renderTL();
+}
+async function fetchORS(a, b, c, d) {
+  try { const r = await fetch(`https://api.openrouteservice.org/v2/directions/foot-walking?api_key=${ORS_KEY}&start=${b},${a}&end=${d},${c}`);
+    const j = await r.json(); return j.features[0].geometry.coordinates.map(x => [x[1], x[0]]); } catch { return null; }
+}
+function simRoute(la, lo, la2, lo2) {
+  const n = 30, c = [];
+  for (let i = 0; i <= n; i++) { const t = i / n, j = Math.sin(t * Math.PI) * .0006;
+    c.push([la + (la2 - la) * t + j * (Math.random() - .5) * 2, lo + (lo2 - lo) * t + j * (Math.random() - .5) * 2]); }
+  return c;
+}
+function findAlong(coords) {
+  return vp().map(p => { let md = Infinity, mi = 0;
+    coords.forEach((c, i) => { const d = hav(p.lat, p.lon, c[0], c[1]); if (d < md) { md = d; mi = i; } });
+    return { ...p, _rd: Math.round(md), _ri: mi };
+  }).filter(p => p._rd < 220).sort((a, b) => a._ri - b._ri);
+}
+function rLen(c) { let d = 0; for (let i = 1; i < c.length; i++) d += hav(c[i-1][0], c[i-1][1], c[i][0], c[i][1]); return d; }
+function startNavSim(td) {
+  if (simNavI) clearInterval(simNavI); simNavP = 0;
+  simNavI = setInterval(() => { simNavP = Math.min(simNavP + .3, 100);
+    document.getElementById('rb-fill').style.width = simNavP + '%'; updateNav();
+    if (simNavP >= 100) clearInterval(simNavI); }, 400);
+}
+function updateNav() {
+  if (!rData) return;
+  const idx = Math.floor((simNavP / 100) * (rData.coords.length - 1));
+  if (!uPos?._r) { const c = rData.coords[idx]; if (c) { uPos.lat = c[0]; uPos.lng = c[1]; placeUser(c[0], c[1]); updateCone(); renderOrbs(); } }
+  rData.pois.forEach(p => { p._passed = p._ri < idx; });
+  const nxt = rData.pois.find(p => !p._passed);
+  if (nxt) { tlEntries = tlEntries.map(e => e.poi?.id === nxt.id ? { ...e, type: 'nxt' } : e.type === 'nxt' ? { ...e, type: 'cur' } : e); renderTL(); }
+}
+function cancelRoute(silent) {
+  if (simNavI) clearInterval(simNavI); rData = null; simNavP = 0;
+  if (rLayer) { map.removeLayer(rLayer); rLayer = null; }
+  if (dMark) { map.removeLayer(dMark); dMark = null; }
+  document.getElementById('rb-fill').style.width = '0%';
+  document.getElementById('route-bar').style.display = 'none';
+  buildTL(); if (!silent) setMode('explore');
+}
+
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+// UTILS
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+function hav(a, b, c, d) { const R = 6371000, r = Math.PI / 180, dL = (c-a)*r, dO = (d-b)*r;
+  const x = Math.sin(dL/2)**2 + Math.cos(a*r)*Math.cos(c*r)*Math.sin(dO/2)**2; return R*2*Math.atan2(Math.sqrt(x),Math.sqrt(1-x)); }
+function brng(a, b, c, d) { const r = Math.PI/180, dl = (d-b)*r;
+  const y = Math.sin(dl)*Math.cos(c*r), x = Math.cos(a*r)*Math.sin(c*r)-Math.sin(a*r)*Math.cos(c*r)*Math.cos(dl);
+  return (Math.atan2(y,x)*180/Math.PI+360)%360; }
+function fmt(m) { return m < 1000 ? `${Math.round(m)} m` : `${(m/1000).toFixed(1)} km`; }
+function nt() { const d = new Date(); return `${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}`; }
+function am(t, m) { const [h,mn] = t.split(':').map(Number), tot = h*60+mn+m; return `${String(Math.floor(tot/60)%24).padStart(2,'0')}:${String(tot%60).padStart(2,'0')}`; }
+
+window.addEventListener('resize', () => { updateCone(); renderOrbs(); });
+
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+// BOOT
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+window.addEventListener('load', () => {
+  if (navigator.geolocation)
+    navigator.geolocation.getCurrentPosition(
+      p => setPos(p.coords.latitude, p.coords.longitude, false),
+      () => {}, { timeout: 2500 });
+});
+</script>
+</body>
+</html>
