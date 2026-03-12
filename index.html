@@ -22,11 +22,11 @@
 }
 html,body{height:100%;height:100dvh;overflow:hidden;background:var(--off);
   font-family:'DM Sans',sans-serif;color:var(--ink);-webkit-font-smoothing:antialiased}
-#app{display:flex;flex-direction:column;height:100dvh;overflow:hidden;}
+#app{display:flex;flex-direction:column;height:100dvh;overflow:hidden}
 
 /* ── TOPBAR ── */
 #topbar{flex-shrink:0;z-index:300;background:var(--white);border-bottom:1px solid var(--border);
-  padding:10px;position:relative}
+  padding:calc(var(--safe-top)+6px) 14px 8px;position:relative}
 .tb1{display:flex;align-items:center;justify-content:space-between;margin-bottom:8px}
 .logo{font-family:'DM Serif Display',serif;font-size:18px;letter-spacing:-.02em;color:var(--ink)}
 .mode-pills{display:flex;background:var(--off);border-radius:10px;padding:2px}
@@ -502,6 +502,21 @@ html,body{height:100%;height:100dvh;overflow:hidden;background:var(--off);
 #ollama-dbg-url{font-size:10px;color:var(--ink3);margin-bottom:4px;word-break:break-all}
 #ollama-dbg-log{font-size:10px;line-height:1.6;max-height:180px;overflow-y:auto}
 
+.tl-preview{ /* truncated state — nothing extra needed */ }
+.tl-expand-btn{
+  display:inline-block;margin-top:5px;padding:3px 10px;
+  border-radius:20px;border:1px solid var(--border);
+  background:var(--off);color:var(--acc);
+  font-size:11px;font-weight:600;cursor:pointer;
+  transition:background .15s;
+}
+.tl-expand-btn:active{background:var(--border)}
+.wiki-badge{
+  display:inline-block;margin-right:5px;
+  font-size:10px;color:#636366;
+}
+.ollama-badge{display:flex;align-items:center;gap:2px;flex-wrap:wrap}
+
 .tl-empty{
   display:flex;flex-direction:column;align-items:center;
   padding:40px 24px;text-align:center;gap:10px;
@@ -813,14 +828,15 @@ let lastSimMsgDist=0, simMsgIdx=0;
 let lastPushedPOIId=null;
 
 // ━━━━━━━ OLLAMA STATE ━━━━━━━
-const DEFAULT_OLLAMA_TUNNEL = "https://domonique-procompensation-elvin.ngrok-free.dev";
-
-let ollamaIP = localStorage.getItem('ollama_ip') || DEFAULT_OLLAMA_TUNNEL;
-let ollamaEnabled = !!ollamaIP;
+const OLLAMA_URL = 'https://domonique-procompensation-elvin.ngrok-free.dev';
+let ollamaIP = OLLAMA_URL;
+let ollamaEnabled = true;
 let lastStreetName = '';
 let lastOllamaStreet = '';
 let ollamaIntervalId = null;
 let ollamaLoading = false;
+let currentCountry = '';
+let currentCity = '';
 
 // ━━━━━━━ MAP ━━━━━━━
 function initMap(lat,lng){
@@ -896,7 +912,6 @@ function requestGPS(){
   },()=>{},{enableHighAccuracy:true});
   requestCompass();
 }
-
 function requestCompass(){
   if(typeof DeviceOrientationEvent!=='undefined'&&
      typeof DeviceOrientationEvent.requestPermission==='function'){
@@ -947,14 +962,14 @@ function setPos(lat,lng){
   setTimeout(()=>{updateCone();renderOrbs();},300);
   document.getElementById('street-banner').classList.add('vis');
   fetchStreet(lat,lng);
-
+  // Warmup model on start
+  warmupOllama();
 }
 
 // ━━━━━━━ REVERSE GEOCODING — via attuale ━━━━━━━
 let lastStreetFetch=0, lastStreetLat=null, lastStreetLng=null;
 
 async function fetchStreet(lat,lng){
-  let currentCity = '';
   // Throttle: don't re-fetch if within 40m of last fetch
   const now=Date.now();
   if(lastStreetLat!==null){
@@ -973,13 +988,6 @@ async function fetchStreet(lat,lng){
     );
     const d=await r.json();
     const a=d.address||{};
-    currentCity =
-      a.city ||
-      a.town ||
-      a.village ||
-      a.municipality ||
-      a.county ||
-      '';
     const street=a.road||a.pedestrian||a.path||a.footway||a.cycleway
                  ||a.residential||a.suburb||a.neighbourhood||a.village||a.town
                  ||d.display_name?.split(',')[0]||'Posizione sconosciuta';
@@ -989,11 +997,15 @@ async function fetchStreet(lat,lng){
     const accEl=document.getElementById('sb-acc');
     accEl.textContent=quarter;
 
-    // Trigger Ollama if street changed
-  if(street!==lastStreetName){
-    lastStreetName=street;
-    triggerOllamaForStreet(street,quarter);
-  }
+    // Capture country and city for prompt context
+    currentCountry = a.country || '';
+    currentCity = a.city || a.town || a.village || a.municipality || '';
+
+    // Trigger Ollama only on street change
+    if(street!==lastStreetName){
+      lastStreetName=street;
+      triggerOllamaForStreet(street, quarter);
+    }
   }catch{
     const el2=document.getElementById('sb-street');
     el2.className='sb-street';
@@ -1086,7 +1098,6 @@ function stopWalkSim(){
 // ━━━━━━━ PLACES — Overpass API ━━━━━━━
 let searchRadius = 600; // meters, user-adjustable
 let overpassAbort = null;
-let currentCity = '';
 
 function loadPlaces(lat, lng) {
   // Always show mock data immediately as fallback
@@ -1350,21 +1361,35 @@ function renderTLEntries(){
     el.innerHTML=`<div class="tl-empty">
       <div class="tl-empty-ico">🤖</div>
       <div class="tl-empty-title">In attesa di Ollama</div>
-      <div class="tl-empty-sub">${ollamaEnabled
-        ? 'Le narrazioni appariranno qui ogni 30 secondi.'
-        : 'Connetti Ollama dal pulsante in alto per attivare le narrazioni AI.'
-      }</div>
+      <div class="tl-empty-sub">Le narrazioni appariranno qui quando cambi via.</div>
     </div>`;
     return;
   }
   el.innerHTML=tlEntries.map((e,i)=>{
     const last=i===tlEntries.length-1;
     const delay=(i*.05).toFixed(2);
-    const bodyHtml=e.loading
-      ?`<div class="tl-shim"></div><div class="tl-shim" style="width:70%;margin-top:5px"></div>`
-      :`<div class="tl-txt">${e.text||''}</div>`;
-    const badge=e.isOllama&&!e.loading
-      ?`<div class="ollama-badge">🤖 llama3.2 · ${e.time}</div>`:'';
+
+    let bodyHtml;
+    if(e.loading){
+      bodyHtml=`<div class="tl-shim"></div><div class="tl-shim" style="width:70%;margin-top:5px"></div>`;
+    } else if(e.text){
+      // Preview: first 90 chars, expand button if longer
+      const PREVIEW_LEN = 90;
+      const isLong = e.text.length > PREVIEW_LEN;
+      const preview = isLong ? e.text.slice(0, PREVIEW_LEN).trimEnd() + '…' : e.text;
+      const eid = e.id || ('e'+i);
+      bodyHtml = isLong
+        ? `<div class="tl-txt tl-preview" id="txt-${eid}">${preview}</div>
+           <button class="tl-expand-btn" id="btn-${eid}" onclick="expandTL('${eid}','${encodeURIComponent(e.text)}')">Leggi tutto ↓</button>`
+        : `<div class="tl-txt">${e.text}</div>`;
+    } else {
+      bodyHtml='';
+    }
+
+    const wikiBadge = e.wikiUsed ? `<span class="wiki-badge">📖 Wikipedia</span>` : '';
+    const badge = e.isOllama&&!e.loading
+      ? `<div class="ollama-badge">${wikiBadge}🤖 llama3.2 · ${e.time}</div>` : '';
+
     return`<div class="tl-e" style="animation-delay:${delay}s">
       <div class="tl-l">
         <div class="tl-ic${e.type==='cur'?' cur':e.type==='fut'?' fut':''}"><span>${e.emoji}</span></div>
@@ -1375,10 +1400,18 @@ function renderTLEntries(){
         <div class="tl-title">${e.title}</div>
         ${bodyHtml}
         ${e.dist&&!e.loading?`<div class="tl-dist">${e.dir} · ${fmt(e.dist)}</div>`:''}
-        ${e.type==='nxt'&&!e.loading?`<div class="dir-chip">Prosegui verso ${e.dirLbl} ${e.dir}</div>`:''}
         ${badge}
       </div></div>`;
   }).join('');
+}
+
+function expandTL(eid, encodedText){
+  const txtEl = document.getElementById('txt-'+eid);
+  const btnEl = document.getElementById('btn-'+eid);
+  if(!txtEl||!btnEl) return;
+  txtEl.textContent = decodeURIComponent(encodedText);
+  txtEl.classList.remove('tl-preview');
+  btnEl.style.display='none';
 }
 
 // push a new entry AT TOP of timeline with animation
@@ -1389,45 +1422,12 @@ function pushTL(entry){
 }
 
 // ━━━━━━━ BIFORK ━━━━━━━
-function checkBif(){
-  if(bifVis||bifDism)return;
-  if(Date.now()-lastBif<14000)return;
-  const v=[...vp()].sort((a,b)=>a.dist-b.dist);
-  if(v.length<2)return;
-  const[a,b]=v;
-  if(Math.abs(a.dist-b.dist)>140)return;
-  const ba=brng(uPos.lat,uPos.lng,a.lat,a.lon);
-  const bb=brng(uPos.lat,uPos.lng,b.lat,b.lon);
-  let diff=Math.abs(ba-bb);if(diff>180)diff=360-diff;
-  if(diff<45)return;
-  showBif(a,b);
-}
-function showBif(a,b){
-  bifVis=true;lastBif=Date.now();
-  document.getElementById('bif-choices').innerHTML=[a,b].map((p,i)=>`
-    <div class="bif-card" id="bc-${i}" onclick="chBif(${p.id},${i})">
-      <div class="bc-ico">${p.emoji}</div>
-      <div class="bc-nm">${p.name}</div>
-      <div class="bc-cat">${CATS[p.cat]||p.cat}</div>
-      <div class="bc-dst">${fmt(p.dist)}</div>
-    </div>`).join('');
-  document.getElementById('bifork').classList.add('vis');
-  [0,1].forEach(i=>setupSwipe(document.getElementById(`bc-${i}`),()=>chBif(i===0?a.id:b.id,i)));
-}
-function chBif(id,idx){
-  document.getElementById(`bc-${idx}`).classList.add('chosen');
-  setTimeout(()=>{dismissBif();selPOI(id);
-    const p=places.find(x=>x.id===id);if(p)pushTL({...p,type:'cur'});},300);
-}
-function dismissBif(){
-  document.getElementById('bifork').classList.remove('vis');
-  bifVis=false;bifDism=true;setTimeout(()=>{bifDism=false;},18000);
-}
-function setupSwipe(el,cb){
-  let sx=0;
-  el.addEventListener('touchstart',e=>{sx=e.touches[0].clientX;},{passive:true});
-  el.addEventListener('touchend',e=>{if(Math.abs(e.changedTouches[0].clientX-sx)>50)cb();},{passive:true});
-}
+function checkBif(){ /* bifork disabled */ }
+function showBif(){ /* bifork disabled */ }
+function chBif(){ /* bifork disabled */ }
+function dismissBif(){ document.getElementById('bifork')?.classList.remove('vis'); }
+function setupSwipe(){}
+
 
 // ━━━━━━━ SELECT ━━━━━━━
 function selPOI(id){
@@ -1602,56 +1602,51 @@ function closeOllamaModal(){
   document.getElementById('ollama-modal').classList.remove('vis');
 }
 
-
-
 async function saveOllamaConfig(){
-
   const isTunnel = ollamaTab === 'tunnel';
-
   const val = isTunnel
-    ? ollamaIP
+    ? document.getElementById('ollama-tunnel-input').value.trim()
     : document.getElementById('ollama-local-input').value.trim();
 
-  if(!val){
-    showOllamaToast('⚠️ Inserisci un indirizzo');
+  if(!val){ showOllamaToast('⚠️ Inserisci un indirizzo'); return; }
+
+  // Validate: tunnel must start with https://
+  if(isTunnel && !val.startsWith('http')){
+    showOllamaToast('⚠️ Incolla l\'URL completo con https://');
     return;
   }
 
   ollamaIP = val;
-
   localStorage.setItem('ollama_ip', val);
   localStorage.setItem('ollama_tab', ollamaTab);
-
   ollamaEnabled = true;
   updateOllamaPill();
 
+  // Show testing state
   const btn = document.querySelector('.os-save');
   btn.textContent = 'Connessione in corso…';
   btn.disabled = true;
 
   const ok = await testOllama();
-
   btn.textContent = 'Connetti e testa';
   btn.disabled = false;
 
   if(ok){
     closeOllamaModal();
     showOllamaToast('✓ Ollama connesso — carico modello in GPU…');
-
     warmupOllama().then(()=>{
       showOllamaToast('✓ llama3.2 pronto');
+      startOllamaInterval();
       if(lastStreetName) triggerOllamaForStreet(lastStreetName);
     });
-
   } else {
-
     const hint = isTunnel
-      ? 'Controlla che il tunnel sia avviato'
-      : 'Controlla IP, stessa WiFi, e che Ollama sia avviato';
-
+      ? 'Controlla che il tunnel sia avviato e l\'URL sia aggiornato'
+      : 'Controlla IP, stessa WiFi, e che Ollama sia avviato con OLLAMA_ORIGINS=*';
     showOllamaToast(`✗ Connessione fallita — ${hint}`);
   }
 }
+
 async function testOllama(){
   try{
     const r=await fetch(`${ollamaBaseUrl()}/api/tags`,{signal:AbortSignal.timeout(6000)});
@@ -1660,34 +1655,45 @@ async function testOllama(){
 }
 
 // Build the prompt for a street name
-function buildStreetPrompt(streetName, quarter){
+// Fetch Wikipedia summary for a street/place
+async function fetchWikiContext(streetName, city, country){
+  // Try Italian Wikipedia first, fallback to English
+  const queries = [];
+  if(city) queries.push(`${streetName} ${city}`);
+  queries.push(streetName);
 
-  const cityName = currentCity || 'questa città';
+  for(const q of queries){
+    try{
+      const lang = country.toLowerCase().includes('ital') ? 'it' : 'en';
+      const url = `https://${lang}.wikipedia.org/api/rest_v1/page/summary/${encodeURIComponent(q)}`;
+      dbg(`Wiki → ${q}`, 'req');
+      const r = await fetch(url, {signal: AbortSignal.timeout(5000)});
+      if(!r.ok) continue;
+      const d = await r.json();
+      if(d.extract && d.extract.length > 80){
+        const snippet = d.extract.slice(0, 600); // max 600 chars to keep prompt lean
+        dbg(`✓ Wiki: "${snippet.slice(0,60)}…"`, 'ok');
+        return snippet;
+      }
+    }catch(e){
+      dbg(`Wiki skip: ${e.message}`, 'info');
+    }
+  }
+  return null;
+}
 
-  const locationParts = [streetName];
-  if (quarter) locationParts.push(`quartiere ${quarter}`);
-  if (cityName) locationParts.push(cityName);
+function buildStreetPrompt(streetName, quarter, wikiContext){
+  const location = [streetName, quarter, currentCity, currentCountry].filter(Boolean).join(', ');
+  const wikiBlock = wikiContext
+    ? `\n\nInformazioni verificate da Wikipedia:\n"${wikiContext}"\n\nUsa queste informazioni come base — sii fedele ai fatti, ma racconta con calore e curiosità.`
+    : '\n\nSe non hai informazioni specifiche, descrivi l\'atmosfera tipica del luogo con un dettaglio autentico.';
 
-  const location = locationParts.join(', ');
+  return `Sei una guida locale esperta. Un viaggiatore sta camminando lungo "${location}".
 
-  return `Sei una guida urbana italiana molto colta e osservatrice.
-
-Un viaggiatore sta camminando in questo momento lungo:
-
-"${location}"
-
-Scrivi un breve racconto immersivo (max 60 parole) su ciò che rende interessante questo luogo.
-
-Linee guida:
-- Parla come una guida locale esperta.
-- Usa dettagli concreti: storia, architettura, vita quotidiana, curiosità, personaggi, atmosfera.
-- Evita frasi generiche da guida turistica.
-- Se la via specifica non è famosa, racconta qualcosa di autentico sul quartiere o sulla città.
-
-Tono:
-calmo, evocativo, intelligente, come qualcuno che cammina accanto al viaggiatore.
-
-Scrivi solo il testo narrativo.`;
+Scrivi UN paragrafo di massimo 60 parole in italiano.
+Racconta qualcosa di specifico: storia, architettura, vita quotidiana, aneddoto, personaggio famoso, o dettaglio inaspettato.
+Tono personale e caldo — come un amico che conosce bene il posto.
+Solo prosa fluida — niente elenchi, niente saluti, niente titoli. Inizia direttamente con il contenuto.${wikiBlock}`;
 }
 
 function toggleDbg(){
@@ -1750,25 +1756,24 @@ function dbg(msg, type='info'){
   console.log(`[Ollama ${type}]`, msg);
 }
 
-async function fetchOllamaNarrative(streetName, quarter){
+async function fetchOllamaNarrative(streetName, quarter, wikiContext){
   if(!ollamaEnabled||!ollamaIP||ollamaLoading)return null;
-  const city = currentCity || '';
   ollamaLoading=true;
   const url=`${ollamaBaseUrl()}/api/generate`;
-  const prompt=buildStreetPrompt(streetName,quarter,city);
+  const prompt=buildStreetPrompt(streetName, quarter, wikiContext);
   dbg(`→ POST ${url}`, 'req');
-  dbg(`  street: "${streetName}"`, 'req');
+  dbg(`  street: "${streetName}" | wiki: ${wikiContext?'sì':'no'}`, 'req');
   try{
     const res=await fetch(url,{
       method:'POST',
-      headers:{'Content-Type':'application/json'},
+      headers:{'Content-Type':'application/json','ngrok-skip-browser-warning':'1'},
       body:JSON.stringify({
         model:'llama3.2',
         prompt,
         stream:false,
         options:{temperature:0.85,num_predict:120}
       }),
-      signal:AbortSignal.timeout(60000) // 60s — prima call carica modello in GPU (~20s)
+      signal:AbortSignal.timeout(60000)
     });
     if(!res.ok){
       const txt=await res.text().catch(()=>'');
@@ -1797,11 +1802,12 @@ async function fetchOllamaNarrative(streetName, quarter){
 
 // Pre-warm: carica modello in GPU subito dopo connessione, così la prima narrazione è veloce
 async function warmupOllama(){
-  dbg('⏳ Caricamento modello in GPU (prima volta ~20s)…', 'info');
+  if(!ollamaEnabled||!ollamaIP)return;
+  dbg('⏳ Warmup modello in GPU…', 'info');
   try{
     const r=await fetch(`${ollamaBaseUrl()}/api/generate`,{
       method:'POST',
-      headers:{'Content-Type':'application/json'},
+      headers:{'Content-Type':'application/json','ngrok-skip-browser-warning':'1'},
       body:JSON.stringify({model:'llama3.2',prompt:'ok',stream:false,options:{num_predict:1}}),
       signal:AbortSignal.timeout(60000)
     });
@@ -1809,7 +1815,7 @@ async function warmupOllama(){
   }catch(e){ dbg(`warmup: ${e.message}`, 'info'); }
 }
 
-async function triggerOllamaForStreet(streetName, quarter='') {
+async function triggerOllamaForStreet(streetName, quarter=''){
   if(!streetName||streetName===lastOllamaStreet)return;
   if(!ollamaEnabled||!ollamaIP){
     dbg('skip: Ollama non configurato', 'info');
@@ -1821,12 +1827,14 @@ async function triggerOllamaForStreet(streetName, quarter='') {
   const loadingId='ollama-'+Date.now();
   pushTL({id:loadingId,type:'cur',emoji:'🤖',title:streetName,text:null,loading:true,isOllama:true});
 
-  const text=await fetchOllamaNarrative(streetName,quarter);
+  // Fetch Wikipedia context in parallel with model warmup
+  const wikiContext = await fetchWikiContext(streetName, currentCity, currentCountry);
+
+  const text=await fetchOllamaNarrative(streetName, quarter, wikiContext);
   if(text){
-    tlEntries=tlEntries.map(e=>e.id===loadingId?{...e,text,loading:false}:e);
+    tlEntries=tlEntries.map(e=>e.id===loadingId?{...e,text,loading:false,wikiUsed:!!wikiContext}:e);
     renderTLEntries();
   } else {
-    // Show error card instead of silently removing
     tlEntries=tlEntries.map(e=>e.id===loadingId
       ?{...e,text:'⚠️ Connessione a Ollama fallita — controlla il pannello debug',loading:false}
       :e);
@@ -1834,6 +1842,12 @@ async function triggerOllamaForStreet(streetName, quarter='') {
   }
 }
 
+// Start 30-second interval — DISABLED, only street-change triggers now
+function startOllamaInterval(){ /* no-op */ }
+function stopOllamaInterval(){
+  if(ollamaIntervalId)clearInterval(ollamaIntervalId);
+  ollamaIntervalId=null;
+}
 
 function showOllamaToast(msg){
   let t=document.getElementById('ollama-toast');
@@ -1859,7 +1873,5 @@ window.addEventListener('load',()=>{
     navigator.geolocation.getCurrentPosition(p=>setPos(p.coords.latitude,p.coords.longitude),()=>{},{timeout:2500});
 });
 </script>
-
-
 </body>
 </html>
