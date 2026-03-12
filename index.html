@@ -120,7 +120,33 @@ html,body{height:100%;height:100dvh;overflow:hidden;background:var(--off);
   background:white!important;color:var(--ink)!important;font-size:14px!important;border:none!important}
 .u-dot{width:12px;height:12px;border-radius:50%;background:var(--blue);
   border:2.5px solid white;box-shadow:0 0 0 3px rgba(0,122,255,.18)}
-#cone-svg{position:absolute;inset:0;pointer-events:none;z-index:9999;width:100%;height:100%}
+#cone-svg{display:none} /* retired */
+
+/* ── COMPASS ARROW ── */
+#compass-arrow{
+  position:absolute;
+  /* will be repositioned by JS to user dot */
+  pointer-events:none;
+  z-index:9999;
+  width:0;height:0; /* anchor point at user */
+  display:none;
+}
+#compass-arrow.vis{display:block}
+#compass-needle{
+  position:absolute;
+  left:-14px;
+  top:-52px; /* extends upward from anchor */
+  width:28px;
+  height:56px;
+  transform-origin:14px 52px; /* rotate around anchor = user dot */
+  /* clip-path creates triangle arrow pointing up */
+  clip-path:polygon(50% 0%, 0% 100%, 100% 100%);
+  background:linear-gradient(to bottom,
+    rgba(0,122,255,0.55) 0%,
+    rgba(0,122,255,0.08) 100%);
+  border-radius:2px 2px 0 0;
+  transition:transform 0.15s ease-out;
+}
 #route-bar{position:absolute;bottom:8px;left:8px;right:8px;z-index:9000;
   background:white;border-radius:11px;padding:9px 12px;
   box-shadow:0 2px 12px rgba(0,0,0,.1);display:none}
@@ -438,6 +464,16 @@ html,body{height:100%;height:100dvh;overflow:hidden;background:var(--off);
 }
 .os-cancel{text-align:center;font-size:12px;color:var(--ink3);cursor:pointer;padding:4px}
 
+/* Tabs */
+.os-tabs{display:flex;background:var(--off);border-radius:10px;padding:2px;margin-bottom:18px}
+.os-tab{flex:1;text-align:center;padding:7px 4px;border-radius:8px;font-size:12px;
+  font-weight:500;color:var(--ink2);cursor:pointer;transition:all .15s}
+.os-tab.active{background:var(--white);color:var(--ink);
+  box-shadow:0 1px 4px rgba(0,0,0,.1)}
+.os-note{font-size:11px;color:var(--orange,#ff9500);
+  background:rgba(255,149,0,.07);border-radius:8px;
+  padding:8px 10px;margin-bottom:12px;line-height:1.5}
+
 /* Ollama badge on timeline card */
 .ollama-badge{
   display:inline-flex;align-items:center;gap:5px;
@@ -466,6 +502,14 @@ html,body{height:100%;height:100dvh;overflow:hidden;background:var(--off);
   white-space:nowrap;pointer-events:none;
 }
 .ollama-toast.vis{opacity:1;transform:translateX(-50%) translateY(0)}
+
+.tl-empty{
+  display:flex;flex-direction:column;align-items:center;
+  padding:40px 24px;text-align:center;gap:10px;
+}
+.tl-empty-ico{font-size:32px;opacity:.4}
+.tl-empty-title{font-family:'DM Serif Display',serif;font-size:16px;color:var(--ink);opacity:.5}
+.tl-empty-sub{font-size:12px;color:var(--ink3);line-height:1.65;max-width:220px}
 
 </style>
 </head>
@@ -520,15 +564,10 @@ html,body{height:100%;height:100dvh;overflow:hidden;background:var(--off);
   <div id="map-zone">
     <div id="map-card">
       <div id="map"></div>
-      <svg id="cone-svg" xmlns="http://www.w3.org/2000/svg">
-        <defs>
-          <radialGradient id="cg" cx="50%" cy="50%" r="70%">
-            <stop offset="0%" stop-color="#007AFF" stop-opacity="0.25"/>
-            <stop offset="100%" stop-color="#007AFF" stop-opacity="0"/>
-          </radialGradient>
-        </defs>
-        <polygon id="cone-poly" fill="url(#cg)"/>
-      </svg>
+      <!-- Compass arrow — replaces SVG cone -->
+      <div id="compass-arrow">
+        <div id="compass-needle"></div>
+      </div>
       <div id="route-bar">
         <div class="rb-row">
           <div class="rb-dest">🏁 <span id="rb-dn">—</span></div>
@@ -580,48 +619,76 @@ html,body{height:100%;height:100dvh;overflow:hidden;background:var(--off);
 <div id="gps-overlay">
   <div class="go-ico">🗺️</div>
   <div class="go-title">Ciao, esploratore.</div>
-  <div class="go-sub">Locus ti guida tra le storie del posto — anche senza una meta.</div>
+  <div class="go-sub">Locus usa la tua posizione GPS per guidarti tra le storie del posto.</div>
   <button class="go-btn" onclick="requestGPS()">Attiva posizione</button>
-  <span class="go-skip" onclick="useDemo()">Demo — Roma centro</span>
 </div>
 
 <!-- OLLAMA MODAL -->
 <div id="ollama-modal" onclick="if(event.target===this)closeOllamaModal()">
   <div class="ollama-sheet">
     <div class="os-title">Connetti Ollama</div>
-    <div class="os-sub">Locus chiamerà llama3.2 sul tuo PC ogni volta che cambi strada, generando una narrazione in tempo reale.</div>
+    <div class="os-sub">Locus chiamerà llama3.2 ogni volta che cambi strada, generando una narrazione in tempo reale.</div>
 
-    <div class="os-step">
-      <div class="os-step-n">1</div>
-      <div class="os-step-txt">
-        <strong>Avvia Ollama con CORS abilitato</strong><br>
-        <span>Nel terminale del PC:</span>
-        <div class="os-code">set OLLAMA_ORIGINS=*
+    <!-- Mode tabs -->
+    <div class="os-tabs">
+      <div class="os-tab active" id="tab-local" onclick="switchOllamaTab('local')">📶 Stessa WiFi</div>
+      <div class="os-tab" id="tab-tunnel" onclick="switchOllamaTab('tunnel')">🌐 Rete esterna</div>
+    </div>
+
+    <!-- LOCAL MODE -->
+    <div id="os-panel-local">
+      <div class="os-step">
+        <div class="os-step-n">1</div>
+        <div class="os-step-txt">
+          <strong>Avvia Ollama con CORS abilitato</strong>
+          <div class="os-code">set OLLAMA_ORIGINS=*
 ollama serve</div>
+        </div>
       </div>
+      <div class="os-step">
+        <div class="os-step-n">2</div>
+        <div class="os-step-txt">
+          <strong>Trova l'IP del PC</strong>
+          <div class="os-code">ipconfig</div>
+          <span>Cerca "Indirizzo IPv4" → es. <code>192.168.1.45</code></span>
+        </div>
+      </div>
+      <div class="os-step">
+        <div class="os-step-n">3</div>
+        <div class="os-step-txt"><strong>Incolla l'IP qui sotto</strong></div>
+      </div>
+      <input class="os-input" id="ollama-local-input" type="text"
+        placeholder="192.168.1.45" autocomplete="off" autocorrect="off" inputmode="decimal">
     </div>
 
-    <div class="os-step">
-      <div class="os-step-n">2</div>
-      <div class="os-step-txt">
-        <strong>Trova l'IP del tuo PC</strong><br>
-        <span>Nel terminale:</span>
-        <div class="os-code">ipconfig</div>
-        <span>Cerca "Indirizzo IPv4" → es. <code>192.168.1.45</code></span>
+    <!-- TUNNEL MODE -->
+    <div id="os-panel-tunnel" style="display:none">
+      <div class="os-step">
+        <div class="os-step-n">1</div>
+        <div class="os-step-txt">
+          <strong>Avvia Ollama con CORS abilitato</strong>
+          <div class="os-code">set OLLAMA_ORIGINS=*
+ollama serve</div>
+        </div>
       </div>
+      <div class="os-step">
+        <div class="os-step-n">2</div>
+        <div class="os-step-txt">
+          <strong>In un secondo terminale, apri il tunnel</strong>
+          <div class="os-code">npx cloudflared tunnel --url http://localhost:11434</div>
+          <span>Aspetta l'URL tipo <code>https://xxxx.trycloudflare.com</code></span>
+        </div>
+      </div>
+      <div class="os-step">
+        <div class="os-step-n">3</div>
+        <div class="os-step-txt"><strong>Incolla l'URL completo qui sotto</strong></div>
+      </div>
+      <input class="os-input" id="ollama-tunnel-input" type="url"
+        placeholder="https://xxxx.trycloudflare.com" autocomplete="off" autocorrect="off">
+      <div class="os-note">⚠️ L'URL cambia ad ogni riavvio del tunnel — aggiornalo qui ogni volta.</div>
     </div>
 
-    <div class="os-step">
-      <div class="os-step-n">3</div>
-      <div class="os-step-txt">
-        <strong>Incolla l'IP qui sotto</strong>
-      </div>
-    </div>
-
-    <input class="os-input" id="ollama-ip-input" type="text"
-      placeholder="192.168.1.45" autocomplete="off" autocorrect="off">
-
-    <button class="os-save" onclick="saveOllamaIP()">Connetti e testa</button>
+    <button class="os-save" onclick="saveOllamaConfig()">Connetti e testa</button>
     <div class="os-cancel" onclick="closeOllamaModal()">Annulla</div>
   </div>
 </div>
@@ -733,31 +800,34 @@ function placeUser(lat,lng){
 }
 function centerUser(){if(uPos&&map)map.flyTo([uPos.lat,uPos.lng],16,{duration:.8});}
 
-// ━━━━━━━ CONE ━━━━━━━
+// ━━━━━━━ COMPASS ARROW ━━━━━━━
 function updateCone(){
   if(!map||!uPos)return;
   const card=document.getElementById('map-card');
-  const W=card.offsetWidth,H=card.offsetHeight;
   const pt=map.latLngToContainerPoint([uPos.lat,uPos.lng]);
-  const cx=pt.x,cy=pt.y;
-  const hw=45, len=Math.max(W,H)*1.3;
-  const lRad=((heading-hw)-90)*Math.PI/180;
-  const rRad=((heading+hw)-90)*Math.PI/180;
-  const lx=cx+Math.cos(lRad)*len, ly=cy+Math.sin(lRad)*len;
-  const rx=cx+Math.cos(rRad)*len, ry=cy+Math.sin(rRad)*len;
-  document.getElementById('cone-poly').setAttribute('points',`${cx},${cy} ${lx},${ly} ${rx},${ry}`);
-  // move gradient center
-  const gx=((cx/W)*100).toFixed(1)+'%', gy=((cy/H)*100).toFixed(1)+'%';
-  const g=document.getElementById('cg');
-  g.setAttribute('cx',gx); g.setAttribute('cy',gy);
+
+  const arrow=document.getElementById('compass-arrow');
+  const needle=document.getElementById('compass-needle');
+
+  // Position anchor exactly on user dot
+  arrow.style.left=pt.x+'px';
+  arrow.style.top=pt.y+'px';
+  arrow.classList.add('vis');
+
+  // Rotate needle: 0°=north (pointing up), heading is clockwise from north
+  needle.style.transform=`rotate(${heading}deg)`;
 }
 
 // ━━━━━━━ GPS + COMPASS ━━━━━━━
 function requestGPS(){
-  if(!navigator.geolocation){useDemo();return;}
+  if(!navigator.geolocation){
+    showOllamaToast('⚠️ GPS non disponibile su questo browser');
+    return;
+  }
   navigator.geolocation.getCurrentPosition(
-    p=>setPos(p.coords.latitude,p.coords.longitude,false),
-    ()=>useDemo(),{enableHighAccuracy:true,timeout:12000});
+    p=>setPos(p.coords.latitude,p.coords.longitude),
+    ()=>showOllamaToast('⚠️ Permesso GPS negato — ricarica la pagina'),
+    {enableHighAccuracy:true,timeout:12000});
   navigator.geolocation.watchPosition(p=>{
     const{latitude:lat,longitude:lng,heading:h}=p.coords;
     uPos={lat,lng,_r:true};
@@ -808,16 +878,16 @@ function onOrient(e){
   }
   renderOrbs();
 }
-function useDemo(){setPos(41.8986,12.4769,true);}
 function setPos(lat,lng){
   uPos={lat,lng};
   document.getElementById('gps-overlay').style.display='none';
   initMap(lat,lng); placeUser(lat,lng); loadPlaces(lat,lng);
   startHeadSim();
   setTimeout(()=>{updateCone();renderOrbs();},300);
-  // show banner immediately with shimmer, then fetch
   document.getElementById('street-banner').classList.add('vis');
   fetchStreet(lat,lng);
+  // Start 30s Ollama interval — fires even when standing still
+  startOllamaInterval();
 }
 
 // ━━━━━━━ REVERSE GEOCODING — via attuale ━━━━━━━
@@ -1191,26 +1261,29 @@ function updateNextCard(){
 }
 function hideNextCard(){document.getElementById('next-card').style.display='none';}
 
-// ━━━━━━━ TIMELINE ━━━━━━━
+// ━━━━━━━ TIMELINE (Ollama only) ━━━━━━━
 function buildTL(){
-  const sorted=[...vp()].sort((a,b)=>a.dist-b.dist);
   updateNextCard();
-  // build entries (no "current" duplicate of next-card)
-  const entries=[];
-  sorted.slice(1,6).forEach((p,i)=>{
-    const bear=uPos?brng(uPos.lat,uPos.lng,p.lat,p.lon):0;
-    const rel=((bear-heading)+360)%360;
-    const di=Math.round(rel/45)%8;
-    entries.push({type:i===0?'nxt':'fut',poi:p,emoji:p.emoji,
-      time:am(nt(),Math.round(p.dist/80)),title:p.name,text:p.text,
-      dist:p.dist,dir:DIRS[di],dirLbl:DLBL[di]});
-  });
-  tlEntries=entries;
-  renderTLEntries();
+  // Timeline entries are injected only by Ollama — clear mock entries
+  if(tlEntries.filter(e=>e.isOllama).length===0){
+    tlEntries=[];
+    renderTLEntries();
+  }
 }
 
 function renderTLEntries(){
   const el=document.getElementById('tl-entries');
+  if(!tlEntries.length){
+    el.innerHTML=`<div class="tl-empty">
+      <div class="tl-empty-ico">🤖</div>
+      <div class="tl-empty-title">In attesa di Ollama</div>
+      <div class="tl-empty-sub">${ollamaEnabled
+        ? 'Le narrazioni appariranno qui ogni 30 secondi.'
+        : 'Connetti Ollama dal pulsante in alto per attivare le narrazioni AI.'
+      }</div>
+    </div>`;
+    return;
+  }
   el.innerHTML=tlEntries.map((e,i)=>{
     const last=i===tlEntries.length-1;
     const delay=(i*.05).toFixed(2);
@@ -1404,8 +1477,28 @@ function cancelRoute(silent){
 
 // ━━━━━━━ OLLAMA ━━━━━━━
 
+// ollamaIP can be either:
+//   "192.168.1.45"            → local WiFi  → http://192.168.1.45:11434
+//   "https://xxxx.trycloudflare.com" → tunnel → use as-is
 function ollamaBaseUrl(){
+  if(!ollamaIP) return '';
+  // If it already looks like a full URL, use it directly
+  if(ollamaIP.startsWith('http://') || ollamaIP.startsWith('https://')){
+    return ollamaIP.replace(/\/+$/,''); // strip trailing slash
+  }
+  // Otherwise treat as bare IP
   return `http://${ollamaIP}:11434`;
+}
+
+// Tab switching in modal
+let ollamaTab = localStorage.getItem('ollama_tab') || 'local';
+function switchOllamaTab(tab){
+  ollamaTab = tab;
+  localStorage.setItem('ollama_tab', tab);
+  document.getElementById('tab-local').className  = 'os-tab' + (tab==='local'?' active':'');
+  document.getElementById('tab-tunnel').className = 'os-tab' + (tab==='tunnel'?' active':'');
+  document.getElementById('os-panel-local').style.display  = tab==='local'  ? '' : 'none';
+  document.getElementById('os-panel-tunnel').style.display = tab==='tunnel' ? '' : 'none';
 }
 
 function updateOllamaPill(){
@@ -1421,34 +1514,66 @@ function updateOllamaPill(){
 }
 
 function openOllamaModal(){
-  document.getElementById('ollama-ip-input').value=ollamaIP;
+  // Restore last saved values into correct fields
+  const savedIP = localStorage.getItem('ollama_ip')||'';
+  const savedTab = localStorage.getItem('ollama_tab')||'local';
+  switchOllamaTab(savedTab);
+  if(savedTab==='local'){
+    document.getElementById('ollama-local-input').value = savedIP;
+  } else {
+    document.getElementById('ollama-tunnel-input').value = savedIP;
+  }
   document.getElementById('ollama-modal').classList.add('vis');
 }
 function closeOllamaModal(){
   document.getElementById('ollama-modal').classList.remove('vis');
 }
-async function saveOllamaIP(){
-  const val=document.getElementById('ollama-ip-input').value.trim();
-  if(!val){alert('Inserisci un IP valido');return;}
-  ollamaIP=val;
-  localStorage.setItem('ollama_ip',val);
-  ollamaEnabled=true;
+
+async function saveOllamaConfig(){
+  const isTunnel = ollamaTab === 'tunnel';
+  const val = isTunnel
+    ? document.getElementById('ollama-tunnel-input').value.trim()
+    : document.getElementById('ollama-local-input').value.trim();
+
+  if(!val){ showOllamaToast('⚠️ Inserisci un indirizzo'); return; }
+
+  // Validate: tunnel must start with https://
+  if(isTunnel && !val.startsWith('http')){
+    showOllamaToast('⚠️ Incolla l\'URL completo con https://');
+    return;
+  }
+
+  ollamaIP = val;
+  localStorage.setItem('ollama_ip', val);
+  localStorage.setItem('ollama_tab', ollamaTab);
+  ollamaEnabled = true;
   updateOllamaPill();
-  closeOllamaModal();
-  // Test connection
-  const ok=await testOllama();
+
+  // Show testing state
+  const btn = document.querySelector('.os-save');
+  btn.textContent = 'Connessione in corso…';
+  btn.disabled = true;
+
+  const ok = await testOllama();
+  btn.textContent = 'Connetti e testa';
+  btn.disabled = false;
+
   if(ok){
+    closeOllamaModal();
     showOllamaToast('✓ Ollama connesso — llama3.2 pronto');
     startOllamaInterval();
-    // Trigger immediately for current street
     if(lastStreetName) triggerOllamaForStreet(lastStreetName);
   } else {
-    showOllamaToast('✗ Impossibile connettersi — controlla IP e che Ollama sia avviato');
+    const hint = isTunnel
+      ? 'Controlla che il tunnel sia avviato e l\'URL sia aggiornato'
+      : 'Controlla IP, stessa WiFi, e che Ollama sia avviato con OLLAMA_ORIGINS=*';
+    showOllamaToast(`✗ Connessione fallita — ${hint}`);
   }
 }
+
 async function testOllama(){
   try{
-    const r=await fetch(`${ollamaBaseUrl()}/api/tags`,{signal:AbortSignal.timeout(4000)});
+    const r=await fetch(`${ollamaBaseUrl()}/api/tags`,{signal:AbortSignal.timeout(6000)});
     return r.ok;
   }catch{return false;}
 }
@@ -1520,11 +1645,16 @@ async function triggerOllamaForStreet(streetName, quarter=''){
   }
 }
 
-// Start 30-second interval
+// Start 30-second interval — fires even when standing still on same street
 function startOllamaInterval(){
   if(ollamaIntervalId)clearInterval(ollamaIntervalId);
   ollamaIntervalId=setInterval(()=>{
-    if(lastStreetName&&ollamaEnabled) triggerOllamaForStreet(lastStreetName);
+    if(!ollamaEnabled||!lastStreetName)return;
+    // Force call regardless of street change
+    const street=lastStreetName;
+    const quarter=document.getElementById('sb-acc')?.textContent||'';
+    lastOllamaStreet=''; // reset so triggerOllama doesn't skip
+    triggerOllamaForStreet(street, quarter);
   },30000);
 }
 function stopOllamaInterval(){
