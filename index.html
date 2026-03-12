@@ -22,11 +22,11 @@
 }
 html,body{height:100%;height:100dvh;overflow:hidden;background:var(--off);
   font-family:'DM Sans',sans-serif;color:var(--ink);-webkit-font-smoothing:antialiased}
-#app{display:flex;flex-direction:column;height:100dvh;overflow:hidden}
+#app{display:flex;flex-direction:column;height:100dvh;overflow:hidden;}
 
 /* ── TOPBAR ── */
 #topbar{flex-shrink:0;z-index:300;background:var(--white);border-bottom:1px solid var(--border);
-  padding:calc(var(--safe-top)+6px) 14px 8px;position:relative}
+  padding:10px;position:relative}
 .tb1{display:flex;align-items:center;justify-content:space-between;margin-bottom:8px}
 .logo{font-family:'DM Serif Display',serif;font-size:18px;letter-spacing:-.02em;color:var(--ink)}
 .mode-pills{display:flex;background:var(--off);border-radius:10px;padding:2px}
@@ -813,7 +813,9 @@ let lastSimMsgDist=0, simMsgIdx=0;
 let lastPushedPOIId=null;
 
 // ━━━━━━━ OLLAMA STATE ━━━━━━━
-let ollamaIP = localStorage.getItem('ollama_ip') || '';
+const DEFAULT_OLLAMA_TUNNEL = "https://domonique-procompensation-elvin.ngrok-free.dev";
+
+let ollamaIP = localStorage.getItem('ollama_ip') || DEFAULT_OLLAMA_TUNNEL;
 let ollamaEnabled = !!ollamaIP;
 let lastStreetName = '';
 let lastOllamaStreet = '';
@@ -1600,50 +1602,56 @@ function closeOllamaModal(){
   document.getElementById('ollama-modal').classList.remove('vis');
 }
 
+
+
 async function saveOllamaConfig(){
+
   const isTunnel = ollamaTab === 'tunnel';
+
   const val = isTunnel
-    ? document.getElementById('ollama-tunnel-input').value.trim()
+    ? ollamaIP
     : document.getElementById('ollama-local-input').value.trim();
 
-  if(!val){ showOllamaToast('⚠️ Inserisci un indirizzo'); return; }
-
-  // Validate: tunnel must start with https://
-  if(isTunnel && !val.startsWith('http')){
-    showOllamaToast('⚠️ Incolla l\'URL completo con https://');
+  if(!val){
+    showOllamaToast('⚠️ Inserisci un indirizzo');
     return;
   }
 
   ollamaIP = val;
+
   localStorage.setItem('ollama_ip', val);
   localStorage.setItem('ollama_tab', ollamaTab);
+
   ollamaEnabled = true;
   updateOllamaPill();
 
-  // Show testing state
   const btn = document.querySelector('.os-save');
   btn.textContent = 'Connessione in corso…';
   btn.disabled = true;
 
   const ok = await testOllama();
+
   btn.textContent = 'Connetti e testa';
   btn.disabled = false;
 
   if(ok){
     closeOllamaModal();
     showOllamaToast('✓ Ollama connesso — carico modello in GPU…');
+
     warmupOllama().then(()=>{
       showOllamaToast('✓ llama3.2 pronto');
       if(lastStreetName) triggerOllamaForStreet(lastStreetName);
     });
+
   } else {
+
     const hint = isTunnel
-      ? 'Controlla che il tunnel sia avviato e l\'URL sia aggiornato'
-      : 'Controlla IP, stessa WiFi, e che Ollama sia avviato con OLLAMA_ORIGINS=*';
+      ? 'Controlla che il tunnel sia avviato'
+      : 'Controlla IP, stessa WiFi, e che Ollama sia avviato';
+
     showOllamaToast(`✗ Connessione fallita — ${hint}`);
   }
 }
-
 async function testOllama(){
   try{
     const r=await fetch(`${ollamaBaseUrl()}/api/tags`,{signal:AbortSignal.timeout(6000)});
