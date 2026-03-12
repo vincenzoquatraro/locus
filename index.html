@@ -944,14 +944,14 @@ function setPos(lat,lng){
   setTimeout(()=>{updateCone();renderOrbs();},300);
   document.getElementById('street-banner').classList.add('vis');
   fetchStreet(lat,lng);
-  // Start 30s Ollama interval — fires even when standing still
-  startOllamaInterval();
+
 }
 
 // ━━━━━━━ REVERSE GEOCODING — via attuale ━━━━━━━
 let lastStreetFetch=0, lastStreetLat=null, lastStreetLng=null;
 
 async function fetchStreet(lat,lng){
+  let currentCity = '';
   // Throttle: don't re-fetch if within 40m of last fetch
   const now=Date.now();
   if(lastStreetLat!==null){
@@ -970,6 +970,13 @@ async function fetchStreet(lat,lng){
     );
     const d=await r.json();
     const a=d.address||{};
+    currentCity =
+      a.city ||
+      a.town ||
+      a.village ||
+      a.municipality ||
+      a.county ||
+      '';
     const street=a.road||a.pedestrian||a.path||a.footway||a.cycleway
                  ||a.residential||a.suburb||a.neighbourhood||a.village||a.town
                  ||d.display_name?.split(',')[0]||'Posizione sconosciuta';
@@ -980,10 +987,10 @@ async function fetchStreet(lat,lng){
     accEl.textContent=quarter;
 
     // Trigger Ollama if street changed
-    if(street!==lastStreetName){
-      lastStreetName=street;
-      triggerOllamaForStreet(street,quarter);
-    }
+  if(street!==lastStreetName){
+    lastStreetName=street;
+    triggerOllamaForStreet(street,quarter);
+  }
   }catch{
     const el2=document.getElementById('sb-street');
     el2.className='sb-street';
@@ -1625,7 +1632,6 @@ async function saveOllamaConfig(){
     showOllamaToast('✓ Ollama connesso — carico modello in GPU…');
     warmupOllama().then(()=>{
       showOllamaToast('✓ llama3.2 pronto');
-      startOllamaInterval();
       if(lastStreetName) triggerOllamaForStreet(lastStreetName);
     });
   } else {
@@ -1644,15 +1650,34 @@ async function testOllama(){
 }
 
 // Build the prompt for a street name
-function buildStreetPrompt(streetName, quarter){
-  const ctx=quarter?`${streetName}, quartiere ${quarter}`:`${streetName}`;
-  return `Sei una guida locale italiana, evocativa e colta. Un viaggiatore sta camminando lungo "${ctx}".
+function buildStreetPrompt(streetName, quarter,city){
 
-Scrivi UN paragrafo di massimo 60 parole in italiano.
-Racconta qualcosa di specifico su questa via o zona: storia, architettura, vita quotidiana, aneddoto, personaggio famoso, o dettaglio inaspettato.
-Tono personale, come un amico che conosce bene il posto.
-Solo prosa fluida — niente elenchi, niente saluti, niente titoli.
-Se non conosci la via specifica, descrivi l'atmosfera tipica del quartiere o della città con un dettaglio autentico.`;
+  const city = currentCity || 'questa città';
+
+  const locationParts = [streetName];
+  if(quarter) locationParts.push(`quartiere ${quarter}`);
+  if(city) locationParts.push(city);
+
+  const location = locationParts.join(', ');
+
+  return `Sei una guida urbana italiana molto colta e osservatrice.
+
+Un viaggiatore sta camminando in questo momento lungo:
+
+"${location}"
+
+Scrivi un breve racconto immersivo (max 60 parole) su ciò che rende interessante questo luogo.
+
+Linee guida:
+- Parla come una guida locale esperta.
+- Usa dettagli concreti: storia, architettura, vita quotidiana, curiosità, personaggi, atmosfera.
+- Evita frasi generiche da guida turistica.
+- Se la via specifica non è famosa, racconta qualcosa di autentico sul quartiere o sulla città.
+
+Tono:
+calmo, evocativo, intelligente, come qualcuno che cammina accanto al viaggiatore.
+
+Scrivi solo il testo narrativo.`;
 }
 
 function toggleDbg(){
@@ -1719,7 +1744,7 @@ async function fetchOllamaNarrative(streetName, quarter){
   if(!ollamaEnabled||!ollamaIP||ollamaLoading)return null;
   ollamaLoading=true;
   const url=`${ollamaBaseUrl()}/api/generate`;
-  const prompt=buildStreetPrompt(streetName,quarter);
+  const prompt=buildStreetPrompt(streetName,quarter,city);
   dbg(`→ POST ${url}`, 'req');
   dbg(`  street: "${streetName}"`, 'req');
   try{
@@ -1773,7 +1798,7 @@ async function warmupOllama(){
   }catch(e){ dbg(`warmup: ${e.message}`, 'info'); }
 }
 
-async function triggerOllamaForStreet(streetName, quarter=''){
+async function triggerOllamaForStreet(streetName, quarter='', city=currentCity) {
   if(!streetName||streetName===lastOllamaStreet)return;
   if(!ollamaEnabled||!ollamaIP){
     dbg('skip: Ollama non configurato', 'info');
@@ -1798,22 +1823,6 @@ async function triggerOllamaForStreet(streetName, quarter=''){
   }
 }
 
-// Start 30-second interval — fires even when standing still on same street
-function startOllamaInterval(){
-  if(ollamaIntervalId)clearInterval(ollamaIntervalId);
-  ollamaIntervalId=setInterval(()=>{
-    if(!ollamaEnabled||!lastStreetName)return;
-    // Force call regardless of street change
-    const street=lastStreetName;
-    const quarter=document.getElementById('sb-acc')?.textContent||'';
-    lastOllamaStreet=''; // reset so triggerOllama doesn't skip
-    triggerOllamaForStreet(street, quarter);
-  },30000);
-}
-function stopOllamaInterval(){
-  if(ollamaIntervalId)clearInterval(ollamaIntervalId);
-  ollamaIntervalId=null;
-}
 
 function showOllamaToast(msg){
   let t=document.getElementById('ollama-toast');
@@ -1839,5 +1848,7 @@ window.addEventListener('load',()=>{
     navigator.geolocation.getCurrentPosition(p=>setPos(p.coords.latitude,p.coords.longitude),()=>{},{timeout:2500});
 });
 </script>
+
+
 </body>
 </html>
