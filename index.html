@@ -894,6 +894,7 @@ function requestGPS(){
   },()=>{},{enableHighAccuracy:true});
   requestCompass();
 }
+
 function requestCompass(){
   if(typeof DeviceOrientationEvent!=='undefined'&&
      typeof DeviceOrientationEvent.requestPermission==='function'){
@@ -1083,6 +1084,7 @@ function stopWalkSim(){
 // ━━━━━━━ PLACES — Overpass API ━━━━━━━
 let searchRadius = 600; // meters, user-adjustable
 let overpassAbort = null;
+let currentCity = '';
 
 function loadPlaces(lat, lng) {
   // Always show mock data immediately as fallback
@@ -1650,13 +1652,13 @@ async function testOllama(){
 }
 
 // Build the prompt for a street name
-function buildStreetPrompt(streetName, quarter,city){
+function buildStreetPrompt(streetName, quarter){
 
-  const city = currentCity || 'questa città';
+  const cityName = currentCity || 'questa città';
 
   const locationParts = [streetName];
-  if(quarter) locationParts.push(`quartiere ${quarter}`);
-  if(city) locationParts.push(city);
+  if (quarter) locationParts.push(`quartiere ${quarter}`);
+  if (cityName) locationParts.push(cityName);
 
   const location = locationParts.join(', ');
 
@@ -1742,6 +1744,7 @@ function dbg(msg, type='info'){
 
 async function fetchOllamaNarrative(streetName, quarter){
   if(!ollamaEnabled||!ollamaIP||ollamaLoading)return null;
+  const city = currentCity || '';
   ollamaLoading=true;
   const url=`${ollamaBaseUrl()}/api/generate`;
   const prompt=buildStreetPrompt(streetName,quarter,city);
@@ -1798,7 +1801,7 @@ async function warmupOllama(){
   }catch(e){ dbg(`warmup: ${e.message}`, 'info'); }
 }
 
-async function triggerOllamaForStreet(streetName, quarter='', city=currentCity) {
+async function triggerOllamaForStreet(streetName, quarter='') {
   if(!streetName||streetName===lastOllamaStreet)return;
   if(!ollamaEnabled||!ollamaIP){
     dbg('skip: Ollama non configurato', 'info');
