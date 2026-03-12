@@ -381,92 +381,6 @@ html,body{height:100%;height:100dvh;overflow:hidden;background:var(--off);
   cursor:pointer;
   color:var(--ink3);
 }
-/* ── OLLAMA ── */
-.ollama-pill{
-  display:flex;align-items:center;gap:5px;
-  font-size:10px;font-weight:500;color:var(--ink3);
-  background:var(--off);border-radius:20px;
-  padding:4px 10px;cursor:pointer;border:1px solid var(--border);
-  transition:all .15s;white-space:nowrap;
-}
-.ollama-pill.on{color:#30d158;border-color:rgba(48,209,88,.3);background:rgba(48,209,88,.07)}
-
-/* Ollama modal backdrop */
-#ollama-modal{
-  position:fixed;inset:0;z-index:900;
-  background:rgba(0,0,0,.4);
-  display:none;align-items:flex-end;justify-content:center;
-}
-#ollama-modal.vis{display:flex}
-.ollama-sheet{
-  background:white;border-radius:20px 20px 0 0;
-  padding:20px 20px calc(env(safe-area-inset-bottom)+24px);
-  width:100%;max-width:480px;
-  max-height:90dvh;overflow-y:auto;
-}
-.os-title{font-family:'DM Serif Display',serif;font-size:19px;color:var(--ink);margin-bottom:6px}
-.os-sub{font-size:12px;color:var(--ink2);line-height:1.65;margin-bottom:18px;font-weight:300}
-.os-step{display:flex;gap:12px;margin-bottom:16px;align-items:flex-start}
-.os-step-n{
-  width:22px;height:22px;border-radius:50%;background:var(--ink);
-  color:white;font-size:11px;font-weight:600;
-  display:flex;align-items:center;justify-content:center;flex-shrink:0;margin-top:1px;
-}
-.os-step-txt{font-size:12px;color:var(--ink2);line-height:1.6}
-.os-step-txt strong{color:var(--ink);font-weight:600;display:block;margin-bottom:3px}
-.os-code{
-  background:var(--off);border-radius:8px;padding:8px 10px;
-  font-family:monospace;font-size:11px;color:var(--ink);
-  margin:6px 0;white-space:pre;overflow-x:auto;
-}
-.os-code code,.os-step-txt code{
-  background:var(--off2);border-radius:4px;padding:1px 5px;
-  font-family:monospace;font-size:11px;color:var(--ink);
-}
-.os-input{
-  width:100%;padding:12px 14px;border-radius:11px;
-  border:1.5px solid var(--border);
-  font-family:'DM Sans',sans-serif;font-size:15px;color:var(--ink);
-  outline:none;transition:border-color .15s;margin-bottom:10px;
-  letter-spacing:.02em;
-}
-.os-input:focus{border-color:var(--blue)}
-.os-save{
-  width:100%;padding:13px;border-radius:11px;background:var(--ink);
-  color:white;font-family:'DM Sans',sans-serif;font-size:14px;
-  font-weight:500;border:none;cursor:pointer;margin-bottom:10px;
-}
-.os-cancel{text-align:center;font-size:12px;color:var(--ink3);cursor:pointer;padding:4px}
-
-/* Ollama badge on timeline card */
-.ollama-badge{
-  display:inline-flex;align-items:center;gap:5px;
-  margin-top:9px;font-size:9px;font-weight:500;color:var(--ink3);
-  background:var(--off);padding:3px 8px;border-radius:20px;
-}
-
-/* Shimmer for loading cards */
-.tl-shim{
-  height:12px;border-radius:4px;
-  background:linear-gradient(90deg,var(--off) 25%,var(--off2) 50%,var(--off) 75%);
-  background-size:200% 100%;
-  animation:shimmer 1.4s infinite;
-  width:90%;
-}
-@keyframes shimmer{0%{background-position:-200% 0}100%{background-position:200% 0}}
-
-/* Toast notification */
-.ollama-toast{
-  position:fixed;bottom:calc(env(safe-area-inset-bottom)+20px);
-  left:50%;transform:translateX(-50%) translateY(20px);
-  background:var(--ink);color:white;
-  padding:10px 18px;border-radius:20px;
-  font-size:12px;font-weight:500;
-  opacity:0;transition:all .3s;z-index:9999;
-  white-space:nowrap;pointer-events:none;
-}
-.ollama-toast.vis{opacity:1;transform:translateX(-50%) translateY(0)}
-
 </style>
 </head>
 <body>
@@ -476,12 +390,9 @@ html,body{height:100%;height:100dvh;overflow:hidden;background:var(--off);
   <div id="topbar">
     <div class="tb1">
       <div class="logo">locus</div>
-      <div style="display:flex;align-items:center;gap:8px">
-        <div class="ollama-pill" id="ollama-pill" onclick="openOllamaModal()">🤖 Connetti AI</div>
-        <div class="mode-pills">
+      <div class="mode-pills">
         <button class="mpill on" id="pill-e" onclick="setMode('explore')">Esplora</button>
         <button class="mpill" id="pill-n" onclick="setMode('navigate')">Naviga</button>
-      </div>
       </div>
     </div>
     <div id="filter-bar">
@@ -585,47 +496,6 @@ html,body{height:100%;height:100dvh;overflow:hidden;background:var(--off);
   <span class="go-skip" onclick="useDemo()">Demo — Roma centro</span>
 </div>
 
-<!-- OLLAMA MODAL -->
-<div id="ollama-modal" onclick="if(event.target===this)closeOllamaModal()">
-  <div class="ollama-sheet">
-    <div class="os-title">Connetti Ollama</div>
-    <div class="os-sub">Locus chiamerà llama3.2 sul tuo PC ogni volta che cambi strada, generando una narrazione in tempo reale.</div>
-
-    <div class="os-step">
-      <div class="os-step-n">1</div>
-      <div class="os-step-txt">
-        <strong>Avvia Ollama con CORS abilitato</strong><br>
-        <span>Nel terminale del PC:</span>
-        <div class="os-code">set OLLAMA_ORIGINS=*
-ollama serve</div>
-      </div>
-    </div>
-
-    <div class="os-step">
-      <div class="os-step-n">2</div>
-      <div class="os-step-txt">
-        <strong>Trova l'IP del tuo PC</strong><br>
-        <span>Nel terminale:</span>
-        <div class="os-code">ipconfig</div>
-        <span>Cerca "Indirizzo IPv4" → es. <code>192.168.1.45</code></span>
-      </div>
-    </div>
-
-    <div class="os-step">
-      <div class="os-step-n">3</div>
-      <div class="os-step-txt">
-        <strong>Incolla l'IP qui sotto</strong>
-      </div>
-    </div>
-
-    <input class="os-input" id="ollama-ip-input" type="text"
-      placeholder="192.168.1.45" autocomplete="off" autocorrect="off">
-
-    <button class="os-save" onclick="saveOllamaIP()">Connetti e testa</button>
-    <div class="os-cancel" onclick="closeOllamaModal()">Annulla</div>
-  </div>
-</div>
-
 <script>
 
   function openPOIPopup(p){
@@ -709,14 +579,6 @@ let headSimI=null;
 let walkSimI=null, walkSimOn=false, walkSimIdx=0, walkSimPath=[];
 let lastSimMsgDist=0, simMsgIdx=0;
 let lastPushedPOIId=null;
-
-// ━━━━━━━ OLLAMA STATE ━━━━━━━
-let ollamaIP = localStorage.getItem('ollama_ip') || '';
-let ollamaEnabled = !!ollamaIP;
-let lastStreetName = '';
-let lastOllamaStreet = '';
-let ollamaIntervalId = null;
-let ollamaLoading = false;
 
 // ━━━━━━━ MAP ━━━━━━━
 function initMap(lat,lng){
@@ -842,20 +704,16 @@ async function fetchStreet(lat,lng){
     );
     const d=await r.json();
     const a=d.address||{};
+    // Pick best label: road > pedestrian > path > suburb > neighbourhood > town
     const street=a.road||a.pedestrian||a.path||a.footway||a.cycleway
                  ||a.residential||a.suburb||a.neighbourhood||a.village||a.town
                  ||d.display_name?.split(',')[0]||'Posizione sconosciuta';
     el.className='sb-street';
     el.textContent=street;
+    // show district/quarter as secondary if available
     const quarter=a.suburb||a.neighbourhood||a.quarter||a.city_district||'';
     const accEl=document.getElementById('sb-acc');
     accEl.textContent=quarter;
-
-    // Trigger Ollama if street changed
-    if(street!==lastStreetName){
-      lastStreetName=street;
-      triggerOllamaForStreet(street,quarter);
-    }
   }catch{
     const el2=document.getElementById('sb-street');
     el2.className='sb-street';
@@ -1214,11 +1072,6 @@ function renderTLEntries(){
   el.innerHTML=tlEntries.map((e,i)=>{
     const last=i===tlEntries.length-1;
     const delay=(i*.05).toFixed(2);
-    const bodyHtml=e.loading
-      ?`<div class="tl-shim"></div><div class="tl-shim" style="width:70%;margin-top:5px"></div>`
-      :`<div class="tl-txt">${e.text||''}</div>`;
-    const badge=e.isOllama&&!e.loading
-      ?`<div class="ollama-badge">🤖 llama3.2 · ${e.time}</div>`:'';
     return`<div class="tl-e" style="animation-delay:${delay}s">
       <div class="tl-l">
         <div class="tl-ic${e.type==='cur'?' cur':e.type==='fut'?' fut':''}"><span>${e.emoji}</span></div>
@@ -1227,17 +1080,17 @@ function renderTLEntries(){
       <div class="tl-b">
         <div class="tl-t">${e.time||nt()}</div>
         <div class="tl-title">${e.title}</div>
-        ${bodyHtml}
-        ${e.dist&&!e.loading?`<div class="tl-dist">${e.dir} · ${fmt(e.dist)}</div>`:''}
-        ${e.type==='nxt'&&!e.loading?`<div class="dir-chip">Prosegui verso ${e.dirLbl} ${e.dir}</div>`:''}
-        ${badge}
+        <div class="tl-txt">${e.text}</div>
+        ${e.dist?`<div class="tl-dist">${e.dir} · ${fmt(e.dist)}</div>`:''}
+        ${e.type==='nxt'?`<div class="dir-chip">Prosegui verso ${e.dirLbl} ${e.dir}</div>`:''}
       </div></div>`;
   }).join('');
 }
 
 // push a new entry AT TOP of timeline with animation
 function pushTL(entry){
-  tlEntries.unshift({...entry,time:entry.time||nt()});
+  tlEntries.unshift({...entry,time:nt()});
+  // Re-render with fresh animations
   renderTLEntries();
   document.getElementById('tl-scroll').scrollTo({top:0,behavior:'smooth'});
 }
@@ -1400,144 +1253,6 @@ function cancelRoute(silent){
   document.getElementById('rb-fill').style.width='0%';
   document.getElementById('route-bar').style.display='none';
   buildTL();if(!silent)setMode('explore');
-}
-
-// ━━━━━━━ OLLAMA ━━━━━━━
-
-function ollamaBaseUrl(){
-  return `http://${ollamaIP}:11434`;
-}
-
-function updateOllamaPill(){
-  const pill=document.getElementById('ollama-pill');
-  if(!pill)return;
-  if(ollamaEnabled&&ollamaIP){
-    pill.textContent='🤖 AI attiva';
-    pill.className='ollama-pill on';
-  } else {
-    pill.textContent='🤖 Connetti AI';
-    pill.className='ollama-pill';
-  }
-}
-
-function openOllamaModal(){
-  document.getElementById('ollama-ip-input').value=ollamaIP;
-  document.getElementById('ollama-modal').classList.add('vis');
-}
-function closeOllamaModal(){
-  document.getElementById('ollama-modal').classList.remove('vis');
-}
-async function saveOllamaIP(){
-  const val=document.getElementById('ollama-ip-input').value.trim();
-  if(!val){alert('Inserisci un IP valido');return;}
-  ollamaIP=val;
-  localStorage.setItem('ollama_ip',val);
-  ollamaEnabled=true;
-  updateOllamaPill();
-  closeOllamaModal();
-  // Test connection
-  const ok=await testOllama();
-  if(ok){
-    showOllamaToast('✓ Ollama connesso — llama3.2 pronto');
-    startOllamaInterval();
-    // Trigger immediately for current street
-    if(lastStreetName) triggerOllamaForStreet(lastStreetName);
-  } else {
-    showOllamaToast('✗ Impossibile connettersi — controlla IP e che Ollama sia avviato');
-  }
-}
-async function testOllama(){
-  try{
-    const r=await fetch(`${ollamaBaseUrl()}/api/tags`,{signal:AbortSignal.timeout(4000)});
-    return r.ok;
-  }catch{return false;}
-}
-
-// Build the prompt for a street name
-function buildStreetPrompt(streetName, quarter){
-  const ctx=quarter?`${streetName}, quartiere ${quarter}`:`${streetName}`;
-  return `Sei una guida locale italiana, evocativa e colta. Un viaggiatore sta camminando lungo "${ctx}".
-
-Scrivi UN paragrafo di massimo 60 parole in italiano.
-Racconta qualcosa di specifico su questa via o zona: storia, architettura, vita quotidiana, aneddoto, personaggio famoso, o dettaglio inaspettato.
-Tono personale, come un amico che conosce bene il posto.
-Solo prosa fluida — niente elenchi, niente saluti, niente titoli.
-Se non conosci la via specifica, descrivi l'atmosfera tipica del quartiere o della città con un dettaglio autentico.`;
-}
-
-async function fetchOllamaNarrative(streetName, quarter){
-  if(!ollamaEnabled||!ollamaIP||ollamaLoading)return null;
-  ollamaLoading=true;
-  try{
-    const res=await fetch(`${ollamaBaseUrl()}/api/generate`,{
-      method:'POST',
-      headers:{'Content-Type':'application/json'},
-      body:JSON.stringify({
-        model:'llama3.2',
-        prompt:buildStreetPrompt(streetName,quarter),
-        stream:false,
-        options:{temperature:0.85,num_predict:120}
-      }),
-      signal:AbortSignal.timeout(20000)
-    });
-    if(!res.ok)throw new Error('HTTP '+res.status);
-    const data=await res.json();
-    return data.response?.trim()||null;
-  }catch(e){
-    console.warn('Ollama error:',e);
-    return null;
-  }finally{
-    ollamaLoading=false;
-  }
-}
-
-async function triggerOllamaForStreet(streetName, quarter=''){
-  if(!streetName||streetName===lastOllamaStreet)return;
-  if(!ollamaEnabled||!ollamaIP)return;
-  lastOllamaStreet=streetName;
-
-  // Push loading card immediately
-  const loadingId='ollama-'+Date.now();
-  pushTL({
-    id:loadingId,
-    type:'cur',
-    emoji:'🤖',
-    title:streetName,
-    text:null,
-    loading:true,
-    isOllama:true,
-  });
-
-  const text=await fetchOllamaNarrative(streetName,quarter);
-  if(text){
-    // Update the loading card with real text
-    tlEntries=tlEntries.map(e=>e.id===loadingId?{...e,text,loading:false}:e);
-    renderTLEntries();
-  } else {
-    // Remove failed card silently
-    tlEntries=tlEntries.filter(e=>e.id!==loadingId);
-    renderTLEntries();
-  }
-}
-
-// Start 30-second interval
-function startOllamaInterval(){
-  if(ollamaIntervalId)clearInterval(ollamaIntervalId);
-  ollamaIntervalId=setInterval(()=>{
-    if(lastStreetName&&ollamaEnabled) triggerOllamaForStreet(lastStreetName);
-  },30000);
-}
-function stopOllamaInterval(){
-  if(ollamaIntervalId)clearInterval(ollamaIntervalId);
-  ollamaIntervalId=null;
-}
-
-function showOllamaToast(msg){
-  let t=document.getElementById('ollama-toast');
-  if(!t){t=document.createElement('div');t.id='ollama-toast';document.body.appendChild(t);}
-  t.textContent=msg;
-  t.className='ollama-toast vis';
-  setTimeout(()=>t.classList.remove('vis'),3500);
 }
 
 // ━━━━━━━ UTILS ━━━━━━━
