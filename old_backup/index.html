@@ -122,31 +122,13 @@ html,body{height:100%;height:100dvh;overflow:hidden;background:var(--off);
   border:2.5px solid white;box-shadow:0 0 0 3px rgba(0,122,255,.18)}
 #cone-svg{display:none} /* retired */
 
-/* ── COMPASS ARROW ── */
-#compass-arrow{
-  position:absolute;
-  /* will be repositioned by JS to user dot */
-  pointer-events:none;
-  z-index:9999;
-  width:0;height:0; /* anchor point at user */
-  display:none;
-}
-#compass-arrow.vis{display:block}
-#compass-needle{
-  position:absolute;
-  left:-14px;
-  top:-52px; /* extends upward from anchor */
-  width:28px;
-  height:56px;
-  transform-origin:14px 52px; /* rotate around anchor = user dot */
-  /* clip-path creates triangle arrow pointing up */
-  clip-path:polygon(50% 0%, 0% 100%, 100% 100%);
-  background:linear-gradient(to bottom,
-    rgba(0,122,255,0.55) 0%,
-    rgba(0,122,255,0.08) 100%);
-  border-radius:2px 2px 0 0;
-  transition:transform 0.15s ease-out;
-}
+/* ── USER SVG (Google Maps style dot + cone) ── */
+#user-svg{ overflow:visible }
+/* hide leaflet's default blue dot since we draw our own */
+.u-dot{ display:none }
+
+/* old compass arrow — retired */
+#compass-arrow{ display:none }
 #route-bar{position:absolute;bottom:8px;left:8px;right:8px;z-index:9000;
   background:white;border-radius:11px;padding:9px 12px;
   box-shadow:0 2px 12px rgba(0,0,0,.1);display:none}
@@ -564,10 +546,29 @@ html,body{height:100%;height:100dvh;overflow:hidden;background:var(--off);
   <div id="map-zone">
     <div id="map-card">
       <div id="map"></div>
-      <!-- Compass arrow — replaces SVG cone -->
-      <div id="compass-arrow">
-        <div id="compass-needle"></div>
-      </div>
+      <!-- Google Maps style user dot + direction cone -->
+      <svg id="user-svg" xmlns="http://www.w3.org/2000/svg"
+           style="position:absolute;inset:0;width:100%;height:100%;pointer-events:none;z-index:9999;overflow:visible">
+        <defs>
+          <radialGradient id="cone-grad" cx="50%" cy="0%" r="100%">
+            <stop offset="0%"   stop-color="#007AFF" stop-opacity="0.35"/>
+            <stop offset="100%" stop-color="#007AFF" stop-opacity="0"/>
+          </radialGradient>
+          <filter id="dot-shadow" x="-50%" y="-50%" width="200%" height="200%">
+            <feDropShadow dx="0" dy="1" stdDeviation="2" flood-color="#007AFF" flood-opacity="0.4"/>
+          </filter>
+        </defs>
+        <!-- Direction cone: spicchio, ruota attorno al punto utente -->
+        <g id="cone-group" style="display:none">
+          <path id="cone-path" fill="url(#cone-grad)"/>
+        </g>
+        <!-- User dot: cerchio bianco + cerchio blu interno -->
+        <g id="user-dot-group" style="display:none">
+          <circle id="ud-outer" r="11" fill="white" filter="url(#dot-shadow)"/>
+          <circle id="ud-inner" r="7"  fill="#007AFF"/>
+          <circle id="ud-pulse" r="11" fill="none" stroke="#007AFF" stroke-opacity="0.3" stroke-width="2"/>
+        </g>
+      </svg>
       <div id="route-bar">
         <div class="rb-row">
           <div class="rb-dest">🏁 <span id="rb-dn">—</span></div>
@@ -800,22 +801,43 @@ function placeUser(lat,lng){
 }
 function centerUser(){if(uPos&&map)map.flyTo([uPos.lat,uPos.lng],16,{duration:.8});}
 
-// ━━━━━━━ COMPASS ARROW ━━━━━━━
+// ━━━━━━━ USER DOT + DIRECTION CONE (Google Maps style) ━━━━━━━
 function updateCone(){
   if(!map||!uPos)return;
-  const card=document.getElementById('map-card');
   const pt=map.latLngToContainerPoint([uPos.lat,uPos.lng]);
+  const cx=pt.x, cy=pt.y;
 
-  const arrow=document.getElementById('compass-arrow');
-  const needle=document.getElementById('compass-needle');
+  // Show user dot
+  const dotG=document.getElementById('user-dot-group');
+  const outer=document.getElementById('ud-outer');
+  const inner=document.getElementById('ud-inner');
+  const pulse=document.getElementById('ud-pulse');
+  dotG.style.display='';
+  outer.setAttribute('cx',cx); outer.setAttribute('cy',cy);
+  inner.setAttribute('cx',cx); inner.setAttribute('cy',cy);
+  pulse.setAttribute('cx',cx); pulse.setAttribute('cy',cy);
 
-  // Position anchor exactly on user dot
-  arrow.style.left=pt.x+'px';
-  arrow.style.top=pt.y+'px';
-  arrow.classList.add('vis');
+  // Hide leaflet's default marker (we draw our own)
+  if(uMark) uMark.setOpacity(0);
 
-  // Rotate needle: 0°=north (pointing up), heading is clockwise from north
-  needle.style.transform=`rotate(${heading}deg)`;
+  // Draw direction cone — 60° wide spicchio, 90px long
+  const coneG=document.getElementById('cone-group');
+  const conePath=document.getElementById('cone-path');
+  const CONE_LEN=90, CONE_HALF=30; // degrees half-angle
+  const rad=Math.PI/180;
+  const lAng=(heading-CONE_HALF-90)*rad;
+  const rAng=(heading+CONE_HALF-90)*rad;
+  const lx=cx+Math.cos(lAng)*CONE_LEN;
+  const ly=cy+Math.sin(lAng)*CONE_LEN;
+  const rx=cx+Math.cos(rAng)*CONE_LEN;
+  const ry=cy+Math.sin(rAng)*CONE_LEN;
+  // Arc for the far edge
+  const lxA=cx+Math.cos(lAng)*CONE_LEN;
+  const lyA=cy+Math.sin(lAng)*CONE_LEN;
+  conePath.setAttribute('d',
+    `M${cx},${cy} L${lx},${ly} A${CONE_LEN},${CONE_LEN} 0 0,1 ${rx},${ry} Z`
+  );
+  coneG.style.display='';
 }
 
 // ━━━━━━━ GPS + COMPASS ━━━━━━━
@@ -858,24 +880,26 @@ let _rawHeading = null;
 function onOrient(e){
   let raw = null;
   if(e.webkitCompassHeading != null){
-    // iOS Safari — already returns true north, no inversion needed
+    // iOS Safari — already true north
     raw = e.webkitCompassHeading;
   } else if(e.absolute && e.alpha != null){
-    // Android / Chrome with absolute orientation — alpha counts CW from north
+    // Android Chrome absolute orientation
+    raw = (360 - e.alpha + 360) % 360;
+  } else if(e.alpha != null){
+    // Non-absolute fallback (still useful on Android)
     raw = (360 - e.alpha + 360) % 360;
   } else {
-    // Non-absolute fallback — skip, too noisy
     return;
   }
   if(_rawHeading === null){ _rawHeading = raw; heading = raw; }
   else {
-    // Handle wraparound: if delta > 180 adjust before filtering
     let delta = raw - _rawHeading;
     if(delta > 180) delta -= 360;
     if(delta < -180) delta += 360;
     _rawHeading = (_rawHeading + delta + 360) % 360;
     heading = (heading + COMPASS_ALPHA * ((_rawHeading - heading + 540) % 360 - 180) + 360) % 360;
   }
+  updateCone();
   renderOrbs();
 }
 function setPos(lat,lng){
@@ -933,10 +957,14 @@ async function fetchStreet(lat,lng){
   }
 }
 function startHeadSim(){
+  // No more auto-rotation — heading comes only from gyroscope/GPS
+  // This interval only refreshes orbs and cone position as map pans/zooms
   if(headSimI)clearInterval(headSimI);
   headSimI=setInterval(()=>{
-    if(!uPos?._r){heading=(heading+.5)%360;updateCone();renderOrbs();checkBif();}
-  },80);
+    updateCone();
+    renderOrbs();
+    checkBif();
+  },200);
 }
 
 // ━━━━━━━ WALK SIM ━━━━━━━
