@@ -838,6 +838,12 @@ let lastPushedPOIId=null;
 const OLLAMA_URL = 'https://domonique-procompensation-elvin.ngrok-free.dev';
 let ollamaIP = OLLAMA_URL;
 let ollamaEnabled = true;
+// Headers required for every Ollama/ngrok request
+const OLLAMA_HDR = {
+  'Content-Type': 'application/json',
+  'ngrok-skip-browser-warning': '1',
+  'Accept': 'application/json'
+};
 let lastStreetName = '';
 let lastOllamaStreet = '';
 let ollamaIntervalId = null;
@@ -1656,7 +1662,7 @@ async function saveOllamaConfig(){
 
 async function testOllama(){
   try{
-    const r=await fetch(`${ollamaBaseUrl()}/api/tags`,{signal:AbortSignal.timeout(6000)});
+    const r=await fetch(`${ollamaBaseUrl()}/api/tags`,{headers:OLLAMA_HDR,signal:AbortSignal.timeout(6000)});
     return r.ok;
   }catch{return false;}
 }
@@ -1738,7 +1744,7 @@ async function testOllamaManual(){
   if(!ollamaIP){ dbg('Nessun IP configurato','err'); return; }
   dbg(`Test connessione → ${ollamaBaseUrl()}/api/tags`,'req');
   try{
-    const r=await fetch(`${ollamaBaseUrl()}/api/tags`,{signal:AbortSignal.timeout(6000)});
+    const r=await fetch(`${ollamaBaseUrl()}/api/tags`,{headers:OLLAMA_HDR,signal:AbortSignal.timeout(6000)});
     if(r.ok){
       const d=await r.json();
       const models=(d.models||[]).map(m=>m.name).join(', ')||'nessuno';
@@ -1788,7 +1794,7 @@ async function fetchOllamaNarrative(streetName, quarter, wikiContext){
   try{
     const res=await fetch(url,{
       method:'POST',
-      headers:{'Content-Type':'application/json','ngrok-skip-browser-warning':'1'},
+      headers:OLLAMA_HDR,
       body:JSON.stringify({
         model:'llama3.2',
         prompt,
@@ -1829,7 +1835,7 @@ async function warmupOllama(){
   try{
     const r=await fetch(`${ollamaBaseUrl()}/api/generate`,{
       method:'POST',
-      headers:{'Content-Type':'application/json','ngrok-skip-browser-warning':'1'},
+      headers:OLLAMA_HDR,
       body:JSON.stringify({model:'llama3.2',prompt:'ok',stream:false,options:{num_predict:1}}),
       signal:AbortSignal.timeout(60000)
     });
