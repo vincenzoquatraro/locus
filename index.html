@@ -639,9 +639,19 @@ html,body{height:100%;height:100dvh;overflow:hidden;background:var(--off);
           <span id="ollama-dbg-arrow">▸</span>
         </div>
         <div id="ollama-dbg-body" style="display:none">
-          <div id="ollama-dbg-url"></div>
+          <div id="ollama-dbg-url" style="margin-bottom:8px"></div>
+          <div style="display:flex;gap:6px;margin-bottom:8px">
+            <input id="dbg-url-input" placeholder="https://nuovo-url.ngrok-free.app"
+              style="flex:1;padding:6px 8px;border:1px solid var(--border);border-radius:8px;
+                     font-size:11px;font-family:monospace;background:var(--off)"/>
+            <button onclick="applyDbgUrl()" style="
+              padding:5px 10px;border-radius:8px;
+              background:var(--acc);color:white;border:none;font-size:11px;cursor:pointer;white-space:nowrap">
+              Aggiorna
+            </button>
+          </div>
           <button onclick="testOllamaManual()" style="
-            margin:6px 0 8px;padding:5px 12px;border-radius:8px;
+            margin-bottom:8px;padding:5px 12px;border-radius:8px;
             background:var(--ink);color:white;border:none;font-size:11px;cursor:pointer">
             Testa connessione ora
           </button>
@@ -1652,30 +1662,32 @@ async function testOllama(){
 }
 
 // Build the prompt for a street name
-// Fetch Wikipedia summary for a street/place
+// Fetch Wikipedia summary — best-effort, max 4s, never blocks Ollama
 async function fetchWikiContext(streetName, city, country){
-  // Try Italian Wikipedia first, fallback to English
   const queries = [];
   if(city) queries.push(`${streetName} ${city}`);
   queries.push(streetName);
 
   for(const q of queries){
     try{
-      const lang = country.toLowerCase().includes('ital') ? 'it' : 'en';
+      const lang = (country||'').toLowerCase().includes('ital') ? 'it' : 'en';
       const url = `https://${lang}.wikipedia.org/api/rest_v1/page/summary/${encodeURIComponent(q)}`;
       dbg(`Wiki → ${q}`, 'req');
-      const r = await fetch(url, {signal: AbortSignal.timeout(5000)});
-      if(!r.ok) continue;
-      const d = await r.json();
-      if(d.extract && d.extract.length > 80){
-        const snippet = d.extract.slice(0, 600); // max 600 chars to keep prompt lean
-        dbg(`✓ Wiki: "${snippet.slice(0,60)}…"`, 'ok');
+      const r = await fetch(url, {signal: AbortSignal.timeout(4000)});
+      if(!r.ok || r.status===204){ dbg(`Wiki skip: HTTP ${r.status}`,'info'); continue; }
+      const txt = await r.text();
+      if(!txt||txt.trim().length<10){ dbg('Wiki skip: vuoto','info'); continue; }
+      let d; try{ d=JSON.parse(txt); }catch{ dbg('Wiki skip: JSON invalido','info'); continue; }
+      if(d.extract && d.extract.length>80){
+        const snippet=d.extract.slice(0,500);
+        dbg(`✓ Wiki ${snippet.length} chars`,'ok');
         return snippet;
       }
     }catch(e){
-      dbg(`Wiki skip: ${e.message}`, 'info');
+      dbg(`Wiki skip: ${e.message}`,'info');
     }
   }
+  dbg('Wiki: nessun risultato, Ollama senza contesto','info');
   return null;
 }
 
@@ -1704,9 +1716,22 @@ function toggleDbg(){
 function updateDbgUrl(){
   const el=document.getElementById('ollama-dbg-url');
   if(!el)return;
-  el.textContent=ollamaIP
-    ?`URL: ${ollamaBaseUrl()}/api/generate`
-    :'Ollama non configurato — tap su 🤖 Connetti AI';
+  el.textContent=`URL attivo: ${ollamaBaseUrl()}/api/generate`;
+}
+function applyDbgUrl(){
+  const val=document.getElementById('dbg-url-input')?.value?.trim();
+  if(!val){dbg('Inserisci un URL','err');return;}
+  ollamaIP=val;
+  dbg(`✓ URL aggiornato → ${ollamaBaseUrl()}`,'ok');
+  updateDbgUrl();
+  // Force re-trigger on current street
+  lastOllamaStreet='';
+  warmupOllama().then(()=>{
+    if(lastStreetName){
+      const q=document.getElementById('sb-acc')?.textContent||'';
+      triggerOllamaForStreet(lastStreetName,q);
+    }
+  });
 }
 async function testOllamaManual(){
   updateDbgUrl();
@@ -1814,27 +1839,26 @@ async function warmupOllama(){
 
 async function triggerOllamaForStreet(streetName, quarter=''){
   if(!streetName||streetName===lastOllamaStreet)return;
-  if(!ollamaEnabled||!ollamaIP){
-    dbg('skip: Ollama non configurato', 'info');
-    return;
-  }
+  if(!ollamaEnabled||!ollamaIP){ dbg('skip: Ollama non configurato','info'); return; }
   lastOllamaStreet=streetName;
   dbg(`trigger: "${streetName}"`, 'info');
 
   const loadingId='ollama-'+Date.now();
   pushTL({id:loadingId,type:'cur',emoji:'🤖',title:streetName,text:null,loading:true,isOllama:true});
 
-  // Fetch Wikipedia context in parallel with model warmup
-  const wikiContext = await fetchWikiContext(streetName, currentCity, currentCountry);
+  // Wiki e Ollama: wiki ha max 4s, poi Ollama parte con o senza contesto
+  const wikiResult = await Promise.race([
+    fetchWikiContext(streetName, currentCity, currentCountry),
+    new Promise(res=>setTimeout(()=>res(null),4500))
+  ]);
 
-  const text=await fetchOllamaNarrative(streetName, quarter, wikiContext);
+  const text = await fetchOllamaNarrative(streetName, quarter, wikiResult);
   if(text){
-    tlEntries=tlEntries.map(e=>e.id===loadingId?{...e,text,loading:false,wikiUsed:!!wikiContext}:e);
+    tlEntries=tlEntries.map(e=>e.id===loadingId?{...e,text,loading:false,wikiUsed:!!wikiResult}:e);
     renderTLEntries();
   } else {
     tlEntries=tlEntries.map(e=>e.id===loadingId
-      ?{...e,text:'⚠️ Connessione a Ollama fallita — controlla il pannello debug',loading:false}
-      :e);
+      ?{...e,text:'⚠️ Ollama non ha risposto — riprova',loading:false}:e);
     renderTLEntries();
   }
 }
