@@ -1377,23 +1377,33 @@ function renderTLEntries(){
     </div>`;
     return;
   }
+
   el.innerHTML=tlEntries.map((e,i)=>{
     const last=i===tlEntries.length-1;
     const delay=(i*.05).toFixed(2);
 
     let bodyHtml;
+
     if(e.loading){
       bodyHtml=`<div class="tl-shim"></div><div class="tl-shim" style="width:70%;margin-top:5px"></div>`;
+    
     } else if(e.text){
-      // Preview: first 90 chars, expand button if longer
+
       const PREVIEW_LEN = 90;
       const isLong = e.text.length > PREVIEW_LEN;
       const preview = isLong ? e.text.slice(0, PREVIEW_LEN).trimEnd() + '…' : e.text;
       const eid = e.id || ('e'+i);
+
       bodyHtml = isLong
         ? `<div class="tl-txt tl-preview" id="txt-${eid}">${preview}</div>
-           <button class="tl-expand-btn" id="btn-${eid}" onclick="expandTL('${eid}','${encodeURIComponent(e.text)}')">Leggi tutto ↓</button>`
+           <button class="tl-expand-btn"
+                   id="btn-${eid}"
+                   data-id="${eid}"
+                   data-text="${encodeURIComponent(e.text)}">
+                   Leggi tutto ↓
+           </button>`
         : `<div class="tl-txt">${e.text}</div>`;
+
     } else {
       bodyHtml='';
     }
@@ -1404,7 +1414,9 @@ function renderTLEntries(){
 
     return`<div class="tl-e" style="animation-delay:${delay}s">
       <div class="tl-l">
-        <div class="tl-ic${e.type==='cur'?' cur':e.type==='fut'?' fut':''}"><span>${e.emoji}</span></div>
+        <div class="tl-ic${e.type==='cur'?' cur':e.type==='fut'?' fut':''}">
+          <span>${e.emoji}</span>
+        </div>
         ${!last?`<div class="tl-ln${e.type==='fut'?' dash':''}"></div>`:''}
       </div>
       <div class="tl-b">
@@ -1417,15 +1429,28 @@ function renderTLEntries(){
   }).join('');
 }
 
-function expandTL(eid, encodedText){
+
+/* CLICK HANDLER PER "LEGGI TUTTO" */
+document.addEventListener("click",function(e){
+  if(e.target.classList.contains("tl-expand-btn")){
+      const id = e.target.dataset.id;
+      const text = e.target.dataset.text;
+      expandTL(id,text);
+  }
+});
+
+
+function expandTL(eid,encodedText){
   const txtEl = document.getElementById('txt-'+eid);
   const btnEl = document.getElementById('btn-'+eid);
-  if(!txtEl||!btnEl) return;
+
+  if(!txtEl || !btnEl) return;
+
   txtEl.textContent = decodeURIComponent(encodedText);
   txtEl.classList.remove('tl-preview');
+
   btnEl.style.display='none';
 }
-
 // push a new entry AT TOP of timeline with animation
 function pushTL(entry){
   tlEntries.unshift({...entry,time:entry.time||nt()});
