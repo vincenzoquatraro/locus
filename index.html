@@ -160,16 +160,30 @@ html,body{height:100%;height:100dvh;overflow:hidden;background:var(--off);
 
 /* ── SETTINGS SIDEBAR ── */
 #settings-sidebar{
-  width:0;overflow:hidden;
+  position:absolute;
+  top:-15px;
+  right:20px;
+
+  width:0;
+  overflow:hidden;
+
   background:var(--white);
-  border-left:0px solid var(--border);
-  flex-shrink:0;
-  transition:width .3s cubic-bezier(.4,0,.2,1), border-width .3s;
-  display:flex;flex-direction:column;
+  border:1px solid var(--border);
+  border-radius:12px;
+
+  box-shadow:0 8px 25px rgba(0,0,0,0.15);
+
+  transition:width .2s cubic-bezier(.4,0,.2,1);
+  z-index:99999;
+
+  display:flex;
+  visibility: hidden;
+  flex-direction:column;
 }
+
 #settings-sidebar.vis{
   width:200px;
-  border-left-width:1px;
+  visibility: visible;
 }
 #settings-inner{
   padding:14px;
@@ -765,10 +779,7 @@ html,body{height:100%;height:100dvh;overflow:hidden;background:var(--off);
       <div id="poi-popup"></div>
     </div>
     <div id="orbit-layer"></div>
-  </div><!-- /map-zone -->
-
-  <!-- SETTINGS SIDEBAR -->
-  <div id="settings-sidebar">
+      <div id="settings-sidebar">
     <div id="settings-inner">
       <div class="sp-title">Filtri</div>
       <div id="filter-bar">
@@ -801,6 +812,10 @@ html,body{height:100%;height:100dvh;overflow:hidden;background:var(--off);
       </div>
     </div>
   </div><!-- /settings-sidebar -->
+
+  </div><!-- /map-zone -->
+
+  <!-- SETTINGS SIDEBAR -->
 
   </div><!-- /map-row -->
 
@@ -1778,8 +1793,8 @@ function centerMap(){
   if(!grab || !mapRow) return;
 
   const DEFAULT_H = window.innerHeight * 0.48;
-  const MIN_H = window.innerHeight * 0.15;
-  const MAX_H = window.innerHeight * 0.72;
+  const MIN_H = window.innerHeight * 0.30;
+  const MAX_H = window.innerHeight * 0.48;
 
   mapRow.style.height = DEFAULT_H + 'px';
 
