@@ -838,10 +838,9 @@ let lastPushedPOIId=null;
 const OLLAMA_URL = 'https://domonique-procompensation-elvin.ngrok-free.dev';
 let ollamaIP = OLLAMA_URL;
 let ollamaEnabled = true;
-// Headers required for every Ollama/ngrok request
+// Solo Content-Type — ngrok-skip-browser-warning causa errori CORS preflight
 const OLLAMA_HDR = {
   'Content-Type': 'application/json',
-  'ngrok-skip-browser-warning': '1',
   'Accept': 'application/json'
 };
 let lastStreetName = '';
