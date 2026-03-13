@@ -25,23 +25,49 @@ html,body{height:100%;height:100dvh;overflow:hidden;background:var(--off);
 #app{display:flex;flex-direction:column;height:100dvh;overflow:hidden}
 
 /* ── TOPBAR ── */
-#topbar{flex-shrink:0;z-index:300;background:var(--white);border-bottom:1px solid var(--border);
-  padding:calc(var(--safe-top)+12px) 20px 12px;position:relative}
-.tb1{display:flex;align-items:center;justify-content:space-between;margin-bottom:8px}
-.logo{font-family:'DM Serif Display',serif;font-size:18px;letter-spacing:-.02em;color:var(--ink)}
-.mode-pills{display:flex;background:var(--off);border-radius:10px;padding:2px}
-.mpill{padding:5px 16px;border-radius:8px;font-size:12px;font-weight:500;color:var(--ink2);
-  cursor:pointer;transition:all .18s;border:none;background:none;font-family:'DM Sans',sans-serif}
-.mpill.on{background:var(--white);color:var(--ink);box-shadow:0 1px 4px rgba(0,0,0,.1)}
-#filter-bar{display:flex;gap:7px;overflow-x:auto;scrollbar-width:none;padding-bottom:1px}
+#topbar{
+  flex-shrink:0;z-index:300;
+  background:var(--white);
+  border-bottom:1px solid var(--border);
+  padding: 15px;
+  position:relative;
+}
+.tb1{display:flex;align-items:center;justify-content:space-between;margin-bottom:12px}
+.logo{
+  font-family:'DM Serif Display',serif;
+  font-size:25px;letter-spacing:-.03em;color:var(--ink);
+  display:flex;align-items:center;gap:6px;
+}
+.logo-dot{
+  width:7px;height:7px;border-radius:50%;
+  background:var(--blue);display:inline-block;
+  margin-bottom:2px;
+}
+.mode-pills{
+  display:flex;background:var(--off);border-radius:12px;padding:3px;gap:2px;
+}
+.mpill{
+  padding:6px 18px;border-radius:9px;font-size:12px;font-weight:500;color:var(--ink2);
+  cursor:pointer;transition:all .18s;border:none;background:none;
+  font-family:'DM Sans',sans-serif;letter-spacing:.01em;
+}
+.mpill.on{
+  background:var(--white);color:var(--ink);
+  box-shadow:0 1px 6px rgba(0,0,0,.1),0 0 0 .5px rgba(0,0,0,.04);
+}
+#filter-bar{display:flex;gap:6px;overflow-x:auto;scrollbar-width:none;padding-bottom:2px;margin-top:2px}
 #filter-bar::-webkit-scrollbar{display:none}
-.fc{flex-shrink:0;padding:5px 11px;border-radius:20px;border:1px solid var(--border);
+.fc{
+  flex-shrink:0;padding:6px 13px;border-radius:20px;
+  border:1px solid var(--border);
   background:var(--white);font-size:11px;font-weight:500;color:var(--ink2);
-  cursor:pointer;transition:all .15s;white-space:nowrap}
+  cursor:pointer;transition:all .15s;white-space:nowrap;
+  letter-spacing:.01em;
+}
 .fc.on{background:var(--ink);color:var(--white);border-color:var(--ink)}
-#nav-search{display:none;margin-top:7px}
-.sw{display:flex;align-items:center;background:var(--off);border-radius:11px;
-  padding:0 11px;gap:7px;height:36px;border:1.5px solid transparent;transition:all .15s}
+#nav-search{display:none;margin-top:8px}
+.sw{display:flex;align-items:center;background:var(--off);border-radius:12px;
+  padding:0 12px;gap:7px;height:38px;border:1.5px solid transparent;transition:all .15s}
 .sw:focus-within{background:var(--white);border-color:var(--blue)}
 .si{flex:1;border:none;background:transparent;font-family:'DM Sans',sans-serif;
   font-size:13px;color:var(--ink);outline:none}
@@ -55,7 +81,7 @@ html,body{height:100%;height:100dvh;overflow:hidden;background:var(--off);
 /* ── RADIUS ROW ── */
 #radius-row{
   display:flex;align-items:center;gap:8px;
-  padding:7px 0 0;
+  padding:9px 0 0;
 }
 .radius-lbl{font-size:10px;font-weight:500;color:var(--ink3);white-space:nowrap;letter-spacing:.03em}
 #radius-slider{
@@ -298,19 +324,24 @@ html,body{height:100%;height:100dvh;overflow:hidden;background:var(--off);
 .bc-dst{font-size:10px;color:var(--blue);font-weight:500}
 .bif-skip{text-align:center;margin-top:10px;font-size:12px;color:var(--ink3);cursor:pointer}
 
-/* ── GPS overlay ── */
-#gps-overlay{position:fixed;inset:0;z-index:999;background:white;
-  display:flex;flex-direction:column;align-items:center;justify-content:center;
-  gap:18px;padding:48px 32px;text-align:center}
-.go-ico{width:62px;height:62px;border-radius:18px;background:var(--off);
-  display:flex;align-items:center;justify-content:center;font-size:30px}
-.go-title{font-family:'DM Serif Display',serif;font-size:24px;letter-spacing:-.02em}
-.go-sub{font-size:13px;color:var(--ink2);line-height:1.65;font-weight:300;max-width:260px}
-.go-btn{width:100%;max-width:260px;padding:14px;border-radius:12px;background:var(--ink);
-  color:white;font-family:'DM Sans',sans-serif;font-size:14px;font-weight:500;
-  border:none;cursor:pointer;transition:opacity .15s}
-.go-btn:active{opacity:.8}
-.go-skip{font-size:12px;color:var(--ink3);cursor:pointer;text-decoration:underline;text-underline-offset:2px}
+/* ── GPS indicator (small, non-invasive) ── */
+#gps-indicator{
+  position:fixed;bottom:calc(var(--safe-bot)+16px);left:50%;transform:translateX(-50%);
+  z-index:999;
+  background:rgba(29,29,31,.88);backdrop-filter:blur(12px);
+  color:white;font-size:12px;font-weight:500;
+  padding:8px 16px;border-radius:20px;
+  display:flex;align-items:center;gap:8px;
+  opacity:0;pointer-events:none;
+  transition:opacity .4s;
+  white-space:nowrap;
+}
+#gps-indicator.vis{opacity:1;pointer-events:auto}
+.gps-ind-dot{
+  width:8px;height:8px;border-radius:50%;background:#ff3b30;flex-shrink:0;
+  animation:gps-pulse 1.4s ease-in-out infinite;
+}
+@keyframes gps-pulse{0%,100%{opacity:1;transform:scale(1)}50%{opacity:.4;transform:scale(.7)}}
 @keyframes shimmer{0%{background-position:-200% 0}100%{background-position:200% 0}}
 .shim{background:linear-gradient(90deg,var(--off) 25%,var(--off2) 50%,var(--off) 75%);
   background-size:200% 100%;animation:shimmer 1.4s infinite}
@@ -502,20 +533,56 @@ html,body{height:100%;height:100dvh;overflow:hidden;background:var(--off);
 #ollama-dbg-url{font-size:10px;color:var(--ink3);margin-bottom:4px;word-break:break-all}
 #ollama-dbg-log{font-size:10px;line-height:1.6;max-height:180px;overflow-y:auto}
 
-.tl-preview{ /* truncated state — nothing extra needed */ }
+/* ── NEXT-CARD TOGGLE ── */
+#next-card-toggle{
+  flex-shrink:0;width:26px;height:26px;border-radius:50%;
+  border:1px solid var(--border);background:var(--off);
+  display:none;align-items:center;justify-content:center;
+  font-size:12px;cursor:pointer;color:var(--ink2);
+  transition:all .2s;line-height:1;
+}
+#street-banner.vis #next-card-toggle{display:flex}
+#next-card-toggle:active{background:var(--ink);color:white;border-color:var(--ink)}
+#next-card-toggle.collapsed #next-card-toggle-ico{display:inline-block;transform:rotate(180deg)}
+
+/* ── QUESTIONS after expand ── */
+.tl-questions{
+  margin-top:10px;display:flex;flex-direction:column;gap:6px;
+}
+.tl-q{
+  display:flex;align-items:flex-start;gap:6px;
+  font-size:11px;color:var(--ink2);line-height:1.5;cursor:pointer;
+  padding:6px 9px;border-radius:10px;border:1px solid var(--border);
+  background:var(--off);transition:all .15s;
+}
+.tl-q:active{background:var(--border)}
+.tl-q-ico{font-size:11px;flex-shrink:0;margin-top:1px;opacity:.6}
+.tl-q-row{
+  display:flex;align-items:center;justify-content:space-between;
+  gap:8px;margin-top:10px;
+}
+.tl-ask-more{
+  flex-shrink:0;display:flex;align-items:center;gap:4px;
+  padding:5px 11px;border-radius:20px;
+  background:var(--ink);color:white;
+  font-size:10px;font-weight:600;border:none;cursor:pointer;
+  font-family:'DM Sans',sans-serif;letter-spacing:.01em;
+  transition:opacity .15s;
+}
+.tl-ask-more:active{opacity:.7}
+.tl-ask-more.loading{background:var(--ink3);pointer-events:none}
+
+/* ── EXPAND BTN ── */
 .tl-expand-btn{
-  display:inline-block;margin-top:5px;padding:3px 10px;
+  display:inline-block;margin-top:6px;padding:4px 12px;
   border-radius:20px;border:1px solid var(--border);
-  background:var(--off);color:var(--acc);
+  background:var(--off);color:var(--blue);
   font-size:11px;font-weight:600;cursor:pointer;
-  transition:background .15s;
+  transition:background .15s;letter-spacing:.01em;
 }
 .tl-expand-btn:active{background:var(--border)}
-.wiki-badge{
-  display:inline-block;margin-right:5px;
-  font-size:10px;color:#636366;
-}
-.ollama-badge{display:flex;align-items:center;gap:2px;flex-wrap:wrap}
+.wiki-badge{display:inline-block;margin-right:5px;font-size:10px;color:#636366}
+.ollama-badge{display:flex;align-items:center;gap:2px;flex-wrap:wrap;margin-top:6px}
 
 .tl-empty{
   display:flex;flex-direction:column;align-items:center;
@@ -533,7 +600,7 @@ html,body{height:100%;height:100dvh;overflow:hidden;background:var(--off);
   <!-- TOPBAR -->
   <div id="topbar">
     <div class="tb1">
-      <div class="logo">locus</div>
+      <div class="logo">locus <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24"><path fill="none" stroke="currentColor" stroke-dasharray="48" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 20.5c0 0 -6 -7 -6 -11.5c0 -3.31 2.69 -6 6 -6c3.31 0 6 2.69 6 6c0 4.5 -6 11.5 -6 11.5Z"><animate fill="freeze" attributeName="stroke-dashoffset" dur="0.6s" values="48;0"/><animateTransform attributeName="transform" dur="3s" keyTimes="0;0.3;0.4;0.54;0.6;0.68;0.7;1" repeatCount="indefinite" type="rotate" values="0 12 20.5;0 12 20.5;-8 12 20.5;0 12 20.5;5 12 20.5;-2 12 20.5;0 12 20.5;0 12 20.5"/></path><circle cx="12" cy="9" fill="currentColor"><animate fill="freeze" attributeName="r" begin="0.7s" dur="0.2s" to="2.5"/></circle></svg></div>
       <div class="mode-pills">
         <button class="mpill on" id="pill-e" onclick="setMode('explore')">Esplora</button>
         <button class="mpill" id="pill-n" onclick="setMode('navigate')">Naviga</button>
@@ -626,6 +693,9 @@ html,body{height:100%;height:100dvh;overflow:hidden;background:var(--off);
           <div class="sb-street loading" id="sb-street"></div>
         </div>
         <div class="sb-acc" id="sb-acc"></div>
+        <button id="next-card-toggle" onclick="toggleNextCard()" title="Mostra/nascondi prossima tappa">
+          <span id="next-card-toggle-ico">⌃</span>
+        </button>
       </div>
       <!-- dynamic next-card -->
       <div id="next-card"></div>
@@ -672,12 +742,10 @@ html,body{height:100%;height:100dvh;overflow:hidden;background:var(--off);
 
 </div>
 
-<!-- GPS OVERLAY -->
-<div id="gps-overlay">
-  <div class="go-ico">🗺️</div>
-  <div class="go-title">Ciao, esploratore.</div>
-  <div class="go-sub">Locus usa la tua posizione GPS per guidarti tra le storie del posto.</div>
-  <button class="go-btn" onclick="requestGPS()">Attiva posizione</button>
+<!-- GPS INDICATOR (small, non-invasive) -->
+<div id="gps-indicator">
+  <div class="gps-ind-dot"></div>
+  <span id="gps-ind-txt">GPS non disponibile</span>
 </div>
 
 <!-- OLLAMA MODAL -->
@@ -905,23 +973,48 @@ function updateCone(){
 }
 
 // ━━━━━━━ GPS + COMPASS ━━━━━━━
+function showGpsIndicator(msg){
+  const el=document.getElementById('gps-indicator');
+  const txt=document.getElementById('gps-ind-txt');
+  if(!el)return;
+  txt.textContent=msg||'GPS non disponibile';
+  el.classList.add('vis');
+}
+function hideGpsIndicator(){
+  document.getElementById('gps-indicator')?.classList.remove('vis');
+}
+
 function requestGPS(){
   if(!navigator.geolocation){
-    showOllamaToast('⚠️ GPS non disponibile su questo browser');
+    showGpsIndicator('GPS non supportato da questo browser');
     return;
   }
   navigator.geolocation.getCurrentPosition(
-    p=>setPos(p.coords.latitude,p.coords.longitude),
-    ()=>showOllamaToast('⚠️ Permesso GPS negato — ricarica la pagina'),
-    {enableHighAccuracy:true,timeout:12000});
-  navigator.geolocation.watchPosition(p=>{
-    const{latitude:lat,longitude:lng,heading:h}=p.coords;
-    uPos={lat,lng,_r:true};
-    if(h!=null)heading=h;
-    placeUser(lat,lng); updateCone(); renderOrbs();
-    if(mode==='navigate'&&rData)updateNav();
-    fetchStreet(lat,lng);
-  },()=>{},{enableHighAccuracy:true});
+    p=>{
+      hideGpsIndicator();
+      setPos(p.coords.latitude, p.coords.longitude);
+    },
+    err=>{
+      const msgs={1:'Abilita il GPS nelle impostazioni',2:'Segnale GPS assente',3:'GPS lento — riprovo…'};
+      showGpsIndicator(msgs[err.code]||'GPS non disponibile');
+      // retry after 5s for timeout errors
+      if(err.code===3) setTimeout(requestGPS, 5000);
+    },
+    {enableHighAccuracy:true, timeout:14000, maximumAge:0}
+  );
+  navigator.geolocation.watchPosition(
+    p=>{
+      hideGpsIndicator();
+      const{latitude:lat,longitude:lng,heading:h}=p.coords;
+      uPos={lat,lng,_r:true};
+      if(h!=null)heading=h;
+      placeUser(lat,lng); updateCone(); renderOrbs();
+      if(mode==='navigate'&&rData)updateNav();
+      fetchStreet(lat,lng);
+    },
+    ()=>{},
+    {enableHighAccuracy:true}
+  );
   requestCompass();
 }
 function requestCompass(){
@@ -938,19 +1031,23 @@ function requestCompass(){
   }
 }
 // Low-pass filter for compass — α=0.15 smooths jitter without lag
-const COMPASS_ALPHA = 0.15;
+const COMPASS_ALPHA = 0.06; // più basso = più smussato, meno tremore
+const COMPASS_DEADZONE = 1.5; // ignora variazioni sotto 1.5° — elimina micro-tremori
 let _rawHeading = null;
+let _lastOrientTime = 0;
 
 function onOrient(e){
+  // Throttle: max un aggiornamento ogni 80ms
+  const now = Date.now();
+  if(now - _lastOrientTime < 80) return;
+  _lastOrientTime = now;
+
   let raw = null;
   if(e.webkitCompassHeading != null){
-    // iOS Safari — already true north
     raw = e.webkitCompassHeading;
   } else if(e.absolute && e.alpha != null){
-    // Android Chrome absolute orientation
     raw = (360 - e.alpha + 360) % 360;
   } else if(e.alpha != null){
-    // Non-absolute fallback (still useful on Android)
     raw = (360 - e.alpha + 360) % 360;
   } else {
     return;
@@ -960,6 +1057,8 @@ function onOrient(e){
     let delta = raw - _rawHeading;
     if(delta > 180) delta -= 360;
     if(delta < -180) delta += 360;
+    // Deadzone: ignora piccole variazioni di rumore
+    if(Math.abs(delta) < COMPASS_DEADZONE) return;
     _rawHeading = (_rawHeading + delta + 360) % 360;
     heading = (heading + COMPASS_ALPHA * ((_rawHeading - heading + 540) % 360 - 180) + 360) % 360;
   }
@@ -968,7 +1067,6 @@ function onOrient(e){
 }
 function setPos(lat,lng){
   uPos={lat,lng};
-  document.getElementById('gps-overlay').style.display='none';
   initMap(lat,lng); placeUser(lat,lng); loadPlaces(lat,lng);
   startHeadSim();
   setTimeout(()=>{updateCone();renderOrbs();},300);
@@ -1377,23 +1475,17 @@ function renderTLEntries(){
     </div>`;
     return;
   }
-
   el.innerHTML=tlEntries.map((e,i)=>{
     const last=i===tlEntries.length-1;
     const delay=(i*.05).toFixed(2);
-
     let bodyHtml;
-
     if(e.loading){
       bodyHtml=`<div class="tl-shim"></div><div class="tl-shim" style="width:70%;margin-top:5px"></div>`;
-    
     } else if(e.text){
-
       const PREVIEW_LEN = 90;
       const isLong = e.text.length > PREVIEW_LEN;
       const preview = isLong ? e.text.slice(0, PREVIEW_LEN).trimEnd() + '…' : e.text;
       const eid = e.id || ('e'+i);
-
       bodyHtml = isLong
         ? `<div class="tl-txt tl-preview" id="txt-${eid}">${preview}</div>
            <button class="tl-expand-btn"
@@ -1401,17 +1493,16 @@ function renderTLEntries(){
                    data-id="${eid}"
                    data-text="${encodeURIComponent(e.text)}">
                    Leggi tutto ↓
-           </button>`
+           </button>
+           <div id="after-${eid}"></div>`
         : `<div class="tl-txt">${e.text}</div>`;
-
     } else {
       bodyHtml='';
     }
-
     const wikiBadge = e.wikiUsed ? `<span class="wiki-badge">📖 Wikipedia</span>` : '';
     const badge = e.isOllama&&!e.loading
       ? `<div class="ollama-badge">${wikiBadge}🤖 llama3.2 · ${e.time}</div>` : '';
-
+    const eid2 = e.id || ('e'+i);
     return`<div class="tl-e" style="animation-delay:${delay}s">
       <div class="tl-l">
         <div class="tl-ic${e.type==='cur'?' cur':e.type==='fut'?' fut':''}">
@@ -1421,7 +1512,7 @@ function renderTLEntries(){
       </div>
       <div class="tl-b">
         <div class="tl-t">${e.time||nt()}</div>
-        <div class="tl-title">${e.title}</div>
+        <div class="tl-title" id="tl-title-${eid2}">${e.title}</div>
         ${bodyHtml}
         ${e.dist&&!e.loading?`<div class="tl-dist">${e.dir} · ${fmt(e.dist)}</div>`:''}
         ${badge}
@@ -1429,28 +1520,122 @@ function renderTLEntries(){
   }).join('');
 }
 
-
-/* CLICK HANDLER PER "LEGGI TUTTO" */
-document.addEventListener("click",function(e){
-  if(e.target.classList.contains("tl-expand-btn")){
-      const id = e.target.dataset.id;
-      const text = e.target.dataset.text;
-      expandTL(id,text);
+/* CLICK HANDLER per "Leggi tutto" — evita inline onclick con caratteri speciali */
+document.addEventListener('click', function(e){
+  if(e.target.classList.contains('tl-expand-btn')){
+    const id = e.target.dataset.id;
+    const text = e.target.dataset.text;
+    expandTL(id, text);
   }
 });
 
-
-function expandTL(eid,encodedText){
+function expandTL(eid, encodedText){
   const txtEl = document.getElementById('txt-'+eid);
   const btnEl = document.getElementById('btn-'+eid);
-
   if(!txtEl || !btnEl) return;
-
-  txtEl.textContent = decodeURIComponent(encodedText);
+  const fullText = decodeURIComponent(encodedText);
+  txtEl.textContent = fullText;
   txtEl.classList.remove('tl-preview');
+  btnEl.style.display = 'none';
 
-  btnEl.style.display='none';
+  // Aggiunge domande e "chiedi di più" dopo il testo
+  const after = document.getElementById('after-'+eid);
+  if(!after || document.getElementById('q-'+eid)) return;
+  const questions = generateQuestions(fullText);
+  after.innerHTML = `
+    <div class="tl-questions" id="q-${eid}">
+      ${questions.map(q=>`
+        <div class="tl-q" data-eid="${eid}" data-q="${encodeURIComponent(q)}">
+          <span class="tl-q-ico">💬</span><span>${q}</span>
+        </div>`).join('')}
+    </div>
+    <div class="tl-q-row">
+      <span style="font-size:10px;color:var(--ink3)">Vuoi saperne di più?</span>
+      <button class="tl-ask-more" id="askmore-${eid}" data-eid="${eid}">✦ Chiedi di più</button>
+    </div>`;
 }
+
+function generateQuestions(text){
+  // Extract key nouns/topics from text to form questions
+  const qs = [];
+  if(/\d{3,4}/.test(text)) qs.push('Cosa succedeva qui in quell\'epoca?');
+  if(/chiesa|basilica|duomo|cattedrale/i.test(text)) qs.push('Quando è stata costruita?');
+  if(/palazzo|villa|edificio|architettura/i.test(text)) qs.push('Chi ci abitava?');
+  if(/mercato|commercio|bottega|negozi/i.test(text)) qs.push('Come si viveva qui un tempo?');
+  if(/guerra|battaglia|conflitto|assedio/i.test(text)) qs.push('Quali eventi storici sono accaduti qui?');
+  if(/artista|pittore|scultore|poeta|scrittore/i.test(text)) qs.push('Quali altre opere ha lasciato?');
+  if(/fontana|monumento|statua/i.test(text)) qs.push('Chi ha realizzato quest\'opera?');
+  // Always add fallback questions
+  if(qs.length < 2) qs.push('Cosa rende questo posto unico?');
+  if(qs.length < 2) qs.push('Cosa posso visitare nelle vicinanze?');
+  return qs.slice(0,3);
+}
+
+/* CLICK HANDLER per domande e "chiedi di più" */
+document.addEventListener('click', function(e){
+  const qEl = e.target.closest('.tl-q');
+  if(qEl){
+    const eid = qEl.dataset.eid;
+    const q = decodeURIComponent(qEl.dataset.q);
+    const street = document.getElementById('tl-title-'+eid)?.textContent || lastStreetName;
+    fetchDeepDive(eid, q, street);
+    return;
+  }
+  const moreEl = e.target.closest('.tl-ask-more');
+  if(moreEl){
+    const eid = moreEl.dataset.eid;
+    askMore(eid, moreEl);
+  }
+});
+
+async function askMore(eid, encodedText){
+  const btn = document.getElementById('askmore-'+eid);
+  if(btn){ btn.classList.add('loading'); btn.textContent='⏳ Caricando…'; }
+  const street = lastStreetName;
+  const prompt = `Sei una guida locale esperta. L'utente vuole sapere di più su "${street}" in ${currentCity}, ${currentCountry}.
+
+Approfondisci con dettagli storici, aneddoti, personaggi famosi o curiosità poco note.
+Scrivi 2-3 frasi in italiano, tono caldo e personale. Solo prosa, niente titoli.`;
+  await fetchDeepDive(eid, null, street, prompt, btn);
+}
+
+async function fetchDeepDive(eid, question, street, customPrompt, btn){
+  const prompt = customPrompt || `Sei una guida locale esperta su "${street}" in ${currentCity}, ${currentCountry}.
+Rispondi in italiano, in modo preciso e coinvolgente (max 60 parole): ${question}`;
+
+  if(btn){ btn.classList.add('loading'); btn.textContent='⏳ Caricando…'; }
+
+  try{
+    const res = await fetch(`${ollamaBaseUrl()}/api/generate`,{
+      method:'POST', headers:OLLAMA_HDR,
+      body:JSON.stringify({model:'llama3.2',prompt,stream:false,options:{temperature:0.8,num_predict:120}}),
+      signal:AbortSignal.timeout(60000)
+    });
+    if(!res.ok) throw new Error('HTTP '+res.status);
+    const data = await res.json();
+    const text = data.response?.trim();
+    if(text){
+      // Push a new timeline card with the answer
+      pushTL({type:'cur',emoji:'💬',title:question||'Approfondimento',text,isOllama:true});
+    }
+  }catch(e){
+    dbg(`deepdive error: ${e.message}`,'err');
+  }finally{
+    if(btn){ btn.classList.remove('loading'); btn.textContent='✦ Chiedi di più'; }
+  }
+}
+
+// ── NEXT-CARD TOGGLE ──
+let nextCardVisible = true;
+function toggleNextCard(){
+  const card = document.getElementById('next-card');
+  const btn = document.getElementById('next-card-toggle');
+  nextCardVisible = !nextCardVisible;
+  card.style.display = nextCardVisible ? '' : 'none';
+  btn.classList.toggle('collapsed', !nextCardVisible);
+  document.getElementById('next-card-toggle-ico').textContent = nextCardVisible ? '⌃' : '⌄';
+}
+
 // push a new entry AT TOP of timeline with animation
 function pushTL(entry){
   tlEntries.unshift({...entry,time:entry.time||nt()});
@@ -1919,9 +2104,8 @@ function nt(){const d=new Date();return`${String(d.getHours()).padStart(2,'0')}:
 function am(t,m){const[h,mn]=t.split(':').map(Number),tot=h*60+mn+m;return`${String(Math.floor(tot/60)%24).padStart(2,'0')}:${String(tot%60).padStart(2,'0')}`;}
 
 window.addEventListener('resize',()=>{updateCone();renderOrbs();});
-window.addEventListener('load',()=>{
-  if(navigator.geolocation)
-    navigator.geolocation.getCurrentPosition(p=>setPos(p.coords.latitude,p.coords.longitude),()=>{},{timeout:2500});
+window.addEventListener('load', ()=>{
+  requestGPS();
 });
 </script>
 </body>
