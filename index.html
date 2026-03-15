@@ -2112,46 +2112,43 @@ async function testOllama(){
 
 // Build the prompt for a street name
 // Fetch Wikipedia summary — best-effort, max 4s, never blocks Ollama
-async function fetchWikiContext(streetName, city, country){
-  const queries = [];
-  if(city) queries.push(`${streetName} ${city}`);
-  queries.push(streetName);
+// ━━━━━━━ N8N AGENT ━━━━━━━
+// n8n esposto via ngrok — Ollama gira in localhost contattato da n8n
+const N8N_URL = 'https://domonique-procompensation-elvin.ngrok-free.dev/webhook/locus-narrate';
 
-  for(const q of queries){
-    try{
-      const lang = (country||'').toLowerCase().includes('ital') ? 'it' : 'en';
-      const url = `https://${lang}.wikipedia.org/api/rest_v1/page/summary/${encodeURIComponent(q)}`;
-      dbg(`Wiki → ${q}`, 'req');
-      const r = await fetch(url, {signal: AbortSignal.timeout(4000)});
-      if(!r.ok || r.status===204){ dbg(`Wiki skip: HTTP ${r.status}`,'info'); continue; }
-      const txt = await r.text();
-      if(!txt||txt.trim().length<10){ dbg('Wiki skip: vuoto','info'); continue; }
-      let d; try{ d=JSON.parse(txt); }catch{ dbg('Wiki skip: JSON invalido','info'); continue; }
-      if(d.extract && d.extract.length>80){
-        const snippet=d.extract.slice(0,500);
-        dbg(`✓ Wiki ${snippet.length} chars`,'ok');
-        return snippet;
-      }
-    }catch(e){
-      dbg(`Wiki skip: ${e.message}`,'info');
+async function callN8NAgent(streetName, quarter){
+  if(ollamaLoading) return null;
+  ollamaLoading = true;
+  dbg(`→ n8n: "${streetName}"`, 'req');
+  try{
+    const res = await fetch(N8N_URL, {
+      method: 'POST',
+      headers: {'Content-Type':'application/json','Accept':'application/json'},
+      body: JSON.stringify({
+        street: streetName,
+        city: currentCity,
+        country: currentCountry
+      }),
+      signal: AbortSignal.timeout(60000)
+    });
+    if(!res.ok){
+      dbg(`✗ n8n HTTP ${res.status}`, 'err');
+      return null;
     }
+    const data = await res.json();
+    if(data.success && data.text){
+      dbg(`✓ ${data.text.length} chars | wiki:${data.wikiUsed} osm:${data.osmUsed}`, 'ok');
+      return data;
+    }
+    dbg(`✗ n8n: ${data.error||'risposta vuota'}`, 'err');
+    return null;
+  }catch(e){
+    const msg = e.name==='TimeoutError' ? 'timeout 60s' : e.message;
+    dbg(`✗ n8n: ${msg}`, 'err');
+    return null;
+  }finally{
+    ollamaLoading = false;
   }
-  dbg('Wiki: nessun risultato, Ollama senza contesto','info');
-  return null;
-}
-
-function buildStreetPrompt(streetName, quarter, wikiContext){
-  const location = [streetName, quarter, currentCity, currentCountry].filter(Boolean).join(', ');
-  const wikiBlock = wikiContext
-    ? `\n\nInformazioni verificate da Wikipedia:\n"${wikiContext}"\n\nUsa queste informazioni come base — sii fedele ai fatti, ma racconta con calore e curiosità.`
-    : '\n\nSe non hai informazioni specifiche, descrivi l\'atmosfera tipica del luogo con un dettaglio autentico.';
-
-  return `Sei una guida locale esperta. Un viaggiatore sta camminando lungo "${location}".
-
-Scrivi UN paragrafo di massimo 60 parole in italiano.
-Racconta qualcosa di specifico: storia, architettura, vita quotidiana, aneddoto, personaggio famoso, o dettaglio inaspettato.
-Tono personale e caldo — come un amico che conosce bene il posto.
-Solo prosa fluida — niente elenchi, niente saluti, niente titoli. Inizia direttamente con il contenuto.${wikiBlock}`;
 }
 
 function toggleDbg(){
@@ -2165,48 +2162,40 @@ function toggleDbg(){
 function updateDbgUrl(){
   const el=document.getElementById('ollama-dbg-url');
   if(!el)return;
-  el.textContent=`URL attivo: ${ollamaBaseUrl()}/api/generate`;
+  el.textContent=`URL attivo: ${N8N_URL}`;
 }
 function applyDbgUrl(){
   const val=document.getElementById('dbg-url-input')?.value?.trim();
   if(!val){dbg('Inserisci un URL','err');return;}
-  ollamaIP=val;
-  dbg(`✓ URL aggiornato → ${ollamaBaseUrl()}`,'ok');
+  // Permette di sovrascrivere l'URL n8n a runtime
+  window._n8nUrlOverride = val;
+  dbg(`✓ URL aggiornato → ${val}`,'ok');
   updateDbgUrl();
-  // Force re-trigger on current street
   lastOllamaStreet='';
-  warmupOllama().then(()=>{
-    if(lastStreetName){
-      const q=document.getElementById('sb-acc')?.textContent||'';
-      triggerOllamaForStreet(lastStreetName,q);
-    }
-  });
+  if(lastStreetName){
+    const q=document.getElementById('sb-acc')?.textContent||'';
+    triggerOllamaForStreet(lastStreetName,q);
+  }
 }
 async function testOllamaManual(){
   updateDbgUrl();
-  if(!ollamaIP){ dbg('Nessun IP configurato','err'); return; }
-  dbg(`Test connessione → ${ollamaBaseUrl()}/api/tags`,'req');
+  dbg(`Test connessione → ${N8N_URL}`,'req');
   try{
-    const r=await fetch(`${ollamaBaseUrl()}/api/tags`,{headers:OLLAMA_HDR,signal:AbortSignal.timeout(6000)});
-    if(r.ok){
-      const d=await r.json();
-      const models=(d.models||[]).map(m=>m.name).join(', ')||'nessuno';
-      dbg(`✓ Ollama risponde — modelli: ${models}`,'ok');
-      // Try a mini generate to confirm llama3.2
-      dbg('Test generate llama3.2…','req');
-      lastOllamaStreet=''; // force re-trigger
-      if(lastStreetName) triggerOllamaForStreet(lastStreetName);
-      else {
-        dbg('GPS non ancora pronto — attendi posizione','info');
-      }
+    const res = await fetch(N8N_URL, {
+      method:'POST',
+      headers:{'Content-Type':'application/json','Accept':'application/json'},
+      body: JSON.stringify({street:'Test', city:'Milano', country:'Italia'}),
+      signal: AbortSignal.timeout(10000)
+    });
+    if(res.ok){
+      const d = await res.json();
+      dbg(`✓ n8n risponde — success:${d.success}`,'ok');
+      if(d.text) dbg(`  "${d.text.slice(0,60)}…"`,'ok');
     } else {
-      dbg(`✗ HTTP ${r.status}`,'err');
+      dbg(`✗ HTTP ${res.status}`,'err');
     }
   }catch(e){
-    const hint=e.name==='TypeError'
-      ?`Impossibile raggiungere ${ollamaBaseUrl()} — controlla:\n  1. OLLAMA_HOST=0.0.0.0\n  2. OLLAMA_ORIGINS=*\n  3. Stessa WiFi`
-      :e.message;
-    dbg(`✗ ${hint}`,'err');
+    dbg(`✗ ${e.message}`,'err');
   }
 }
 
@@ -2221,93 +2210,29 @@ function dbg(msg, type='info'){
   line.style.cssText=`color:${colors[type]||colors.info};padding:2px 0;border-bottom:1px solid #f0f0f0;word-break:break-all`;
   line.textContent=`${ts} ${msg}`;
   el.insertBefore(line, el.firstChild);
-  // Keep max 20 lines
   while(el.children.length>20) el.removeChild(el.lastChild);
-  // Also show in browser console
-  console.log(`[Ollama ${type}]`, msg);
+  console.log(`[n8n ${type}]`, msg);
 }
 
-async function fetchOllamaNarrative(streetName, quarter, wikiContext){
-  if(!ollamaEnabled||!ollamaIP||ollamaLoading)return null;
-  ollamaLoading=true;
-  const url=`${ollamaBaseUrl()}/api/generate`;
-  const prompt=buildStreetPrompt(streetName, quarter, wikiContext);
-  dbg(`→ POST ${url}`, 'req');
-  dbg(`  street: "${streetName}" | wiki: ${wikiContext?'sì':'no'}`, 'req');
-  try{
-    const res=await fetch(url,{
-      method:'POST',
-      headers:OLLAMA_HDR,
-      body:JSON.stringify({
-        model:'llama3.2',
-        prompt,
-        stream:false,
-        options:{temperature:0.85,num_predict:120}
-      }),
-      signal:AbortSignal.timeout(60000)
-    });
-    if(!res.ok){
-      const txt=await res.text().catch(()=>'');
-      dbg(`✗ HTTP ${res.status}: ${txt.slice(0,80)}`, 'err');
-      return null;
-    }
-    const data=await res.json();
-    const text=data.response?.trim()||null;
-    if(text){
-      dbg(`✓ risposta ${text.length} chars`, 'ok');
-      dbg(`  "${text.slice(0,60)}…"`, 'ok');
-    } else {
-      dbg('✗ risposta vuota', 'err');
-    }
-    return text;
-  }catch(e){
-    const msg=e.name==='TimeoutError'?'timeout (60s) — riprova, il modello si sta caricando'
-             :e.name==='TypeError'?`rete: ${e.message}`
-             :e.message;
-    dbg(`✗ ${msg}`, 'err');
-    return null;
-  }finally{
-    ollamaLoading=false;
-  }
-}
-
-// Pre-warm: carica modello in GPU subito dopo connessione, così la prima narrazione è veloce
 async function warmupOllama(){
-  if(!ollamaEnabled||!ollamaIP)return;
-  dbg('⏳ Warmup modello in GPU…', 'info');
-  try{
-    const r=await fetch(`${ollamaBaseUrl()}/api/generate`,{
-      method:'POST',
-      headers:OLLAMA_HDR,
-      body:JSON.stringify({model:'llama3.2',prompt:'ok',stream:false,options:{num_predict:1}}),
-      signal:AbortSignal.timeout(60000)
-    });
-    if(r.ok) dbg('✓ Modello pronto in GPU', 'ok');
-  }catch(e){ dbg(`warmup: ${e.message}`, 'info'); }
+  dbg('n8n agent pronto', 'info');
 }
 
 async function triggerOllamaForStreet(streetName, quarter=''){
   if(!streetName||streetName===lastOllamaStreet)return;
-  if(!ollamaEnabled||!ollamaIP){ dbg('skip: Ollama non configurato','info'); return; }
   lastOllamaStreet=streetName;
   dbg(`trigger: "${streetName}"`, 'info');
 
   const loadingId='ollama-'+Date.now();
   pushTL({id:loadingId,type:'cur',emoji:'<svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24"><path fill="currentColor" d="m20.713 7.128l-.246.566a.506.506 0 0 1-.934 0l-.246-.566a4.36 4.36 0 0 0-2.22-2.25l-.759-.339a.53.53 0 0 1 0-.963l.717-.319A4.37 4.37 0 0 0 19.276.931L19.53.32a.506.506 0 0 1 .942 0l.253.61a4.37 4.37 0 0 0 2.25 2.327l.718.32a.53.53 0 0 1 0 .962l-.76.338a4.36 4.36 0 0 0-2.219 2.251M8.5 6h-2v12h2zM4 10H2v4h2zm9-8h-2v20h2zm4.5 6h-2v10h2zm4.5 2h-2v4h2z"/></svg>',title:streetName,text:null,loading:true,isOllama:true});
 
-  // Wiki e Ollama: wiki ha max 4s, poi Ollama parte con o senza contesto
-  const wikiResult = await Promise.race([
-    fetchWikiContext(streetName, currentCity, currentCountry),
-    new Promise(res=>setTimeout(()=>res(null),4500))
-  ]);
-
-  const text = await fetchOllamaNarrative(streetName, quarter, wikiResult);
-  if(text){
-    tlEntries=tlEntries.map(e=>e.id===loadingId?{...e,text,loading:false,wikiUsed:!!wikiResult}:e);
+  const result = await callN8NAgent(streetName, quarter);
+  if(result){
+    tlEntries=tlEntries.map(e=>e.id===loadingId?{...e,text:result.text,loading:false,wikiUsed:result.wikiUsed}:e);
     renderTLEntries();
   } else {
     tlEntries=tlEntries.map(e=>e.id===loadingId
-      ?{...e,text:'⚠️ Ollama non ha risposto — riprova',loading:false}:e);
+      ?{...e,text:'⚠️ Agente non raggiungibile — controlla n8n e ngrok',loading:false}:e);
     renderTLEntries();
   }
 }
