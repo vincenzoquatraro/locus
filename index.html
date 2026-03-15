@@ -998,24 +998,7 @@ function goToPOI(id){
 }
 // ━━━━━━━ DATA ━━━━━━━
 const ORS_KEY = '';
-const PD = [
-  {id:1,name:'Piazza Navona',cat:'monument',emoji:'🏛️',lo:.0022,ln:.0012,
-   text:'Costruita sullo stadio di Domiziano nel I sec. d.C. La Fontana dei Quattro Fiumi di Bernini è un capolavoro di teatralità barocca che ancora oggi toglie il fiato.'},
-  {id:2,name:'Trattoria da Enzo',cat:'food',emoji:'🍽️',lo:-.0013,ln:.0025,
-   text:'Cucina romana autentica dal 1962 — la carbonara ancora con guanciale e pecorino, senza panna. La fila fuori è lunga e giusta.'},
-  {id:3,name:'Pantheon',cat:'monument',emoji:'⛩️',lo:.0035,ln:-.0014,
-   text:"L'oculus è aperto alla pioggia. In 2000 anni nessuno ha trovato un sistema migliore per smaltirla — il pavimento convesso drena tutto da solo."},
-  {id:4,name:'Galleria Doria Pamphilj',cat:'art',emoji:'🎨',lo:.0028,ln:.0038,
-   text:'Ancora di proprietà della famiglia. Il ritratto di Innocenzo X del Velázquez — che il pittore stesso considerava il suo capolavoro assoluto — è qui.'},
-  {id:5,name:"Giardini dell'Arancio",cat:'nature',emoji:'🌿',lo:-.0048,ln:.0015,
-   text:'Il belvedere più bello di Roma che quasi nessuno conosce. Il terrazzino al tramonto vale una deviazione di venti minuti.'},
-  {id:6,name:"Campo de' Fiori",cat:'monument',emoji:'🌸',lo:-.0025,ln:-.0028,
-   text:"Di mattina mercato, di sera aperitivi. Giordano Bruno al centro fu bruciato qui nel 1600. Una piazza che non ha mai smesso di essere viva."},
-  {id:7,name:'Bar San Calisto',cat:'food',emoji:'☕',lo:-.0035,ln:-.001,
-   text:'Il bar preferito di Trastevere. Caffè a 1 euro, tavolini fuori, la sensazione di aver trovato il posto giusto.'},
-  {id:8,name:'Basilica di Santa Maria',cat:'monument',emoji:'⛪',lo:-.002,ln:-.0038,
-   text:'Una delle basiliche più antiche di Roma. I mosaici del XII secolo sono tra le cose più belle visibili senza fila.'},
-];
+const PD = []; // POI caricati dinamicamente da Overpass API
 const CATS={monument:'Monumento',food:'Cucina',art:'Arte',nature:'Natura',shop:'Shopping'};
 const DIRS=['↑','↗','→','↘','↓','↙','←','↖'];
 const DLBL=['nord','nord-est','est','sud-est','sud','sud-ovest','ovest','nord-ovest'];
@@ -1413,12 +1396,8 @@ let searchRadius = 600; // meters, user-adjustable
 let overpassAbort = null;
 
 function loadPlaces(lat, lng) {
-  // Always show mock data immediately as fallback
-  places = PD.map(p=>({...p, lat:lat+p.lo, lon:lng+p.ln,
-    dist:Math.round(hav(lat,lng,lat+p.lo,lng+p.ln))})).sort((a,b)=>a.dist-b.dist);
+  places = [];
   renderPins([]); renderOrbs(); buildTL();
-
-  // Then fetch real POIs from Overpass
   fetchOverpass(lat, lng, searchRadius);
 }
 
@@ -1624,8 +1603,11 @@ function borderPt(cx,cy,W,H,deg,pad){
 function renderPins(onRoute){
   Object.values(pMarkers).forEach(m=>m.setMap(null)); pMarkers={};
   vp().forEach(p=>{
+    const lat = parseFloat(p.lat);
+    const lng = parseFloat(p.lon ?? p.lng);
+    if(!isFinite(lat)||!isFinite(lng)) return;
     const marker = new google.maps.Marker({
-      position:{lat:p.lat,lng:p.lon}, map,
+      position:{lat, lng}, map,
       icon:{
         url: `data:image/svg+xml;charset=UTF-8,${encodeURIComponent(`
           <svg xmlns="http://www.w3.org/2000/svg" width="26" height="36">
@@ -1958,11 +1940,13 @@ function setupSwipe(){}
 
 // ━━━━━━━ SELECT ━━━━━━━
 function selPOI(id){
-  selId=id;renderOrbs();
-  document.querySelectorAll('.mp2').forEach(e=>e.classList.remove('sel'));
-  document.querySelector(`#pin-${id}`)?.classList.add('sel');
+  selId=id; renderOrbs(); renderPins([]);
   const p=places.find(x=>x.id===id);
-  if(p&&map)map.panTo([p.lat,p.lon],{animate:true,duration:.5});
+  if(!p||!map) return;
+  const lat = parseFloat(p.lat);
+  const lng = parseFloat(p.lon ?? p.lng);
+  if(!isFinite(lat) || !isFinite(lng)) return;
+  map.panTo({lat, lng});
 }
 
 // ━━━━━━━ MODE ━━━━━━━
@@ -1983,16 +1967,12 @@ document.getElementById('si').addEventListener('input',e=>{
 document.getElementById('si').addEventListener('keydown',e=>{
   if(e.key==='Enter'){const v=e.target.value.trim();if(v)geocode(v,true);}});
 async function geocode(q,imm=false){
-  const dm=[{name:'Colosseo',lat:41.8902,lng:12.4922},{name:'Vaticano',lat:41.9022,lng:12.4539},
-    {name:'Trastevere',lat:41.8895,lng:12.4697},{name:'Piazza di Spagna',lat:41.9058,lng:12.4823},
-    {name:'Termini',lat:41.9009,lng:12.5005},{name:'Testaccio',lat:41.8776,lng:12.4772}];
-  const mt=dm.filter(d=>d.name.toLowerCase().includes(q.toLowerCase()));
-  if(mt.length){if(imm&&mt.length===1){startNav(mt[0]);return;}showSug(mt);return;}
   try{
-    const r=await fetch(`https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(q)}&format=json&limit=4&countrycodes=it`,{headers:{'Accept-Language':'it'}});
+    const r=await fetch(`https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(q)}&format=json&limit=4`,{headers:{'Accept-Language':'it'}});
     const d=await r.json();
     const res=d.map(x=>({name:x.display_name.split(',')[0],sub:x.display_name.split(',').slice(1,3).join(',').trim(),lat:parseFloat(x.lat),lng:parseFloat(x.lon)}));
-    if(imm&&res.length===1){startNav(res[0]);hideSug();return;}showSug(res);
+    if(imm&&res.length===1){startNav(res[0]);hideSug();return;}
+    showSug(res);
   }catch{hideSug();}
 }
 function showSug(l){
