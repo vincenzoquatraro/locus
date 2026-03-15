@@ -9,8 +9,7 @@
 <meta name="theme-color" content="#ffffff">
 <title>Locus</title>
 <link href="https://fonts.googleapis.com/css2?family=DM+Sans:opsz,wght@9..40,300;9..40,400;9..40,500;9..40,600&family=DM+Serif+Display:ital@0;1&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
-<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="https://maps.googleapis.com/maps/api/js?key=AIzaSyARom45-Kk30a_L2HT7gYMEY9ooDPuA6_U&libraries=places,geometry"></script>
 <style>
 *{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent;user-select:none}
 :root{
@@ -239,22 +238,10 @@ html,body{height:100%;height:100dvh;overflow:hidden;background:var(--off);
   box-shadow:0 2px 16px rgba(0,0,0,.12);border:1px solid rgba(0,0,0,.06);
 }
 #map{width:100%;height:100%;}
-.leaflet-control-attribution{display:none!important}
-.leaflet-control-zoom{border:none!important;border-radius:10px!important;overflow:hidden;
-  box-shadow:0 2px 8px rgba(0,0,0,.1)!important;margin:8px!important}
-.leaflet-control-zoom a{width:30px!important;height:30px!important;line-height:30px!important;
-  background:white!important;color:var(--ink)!important;font-size:14px!important;border:none!important}
-.u-dot{width:12px;height:12px;border-radius:50%;background:var(--blue);
-  border:2.5px solid white;box-shadow:0 0 0 3px rgba(0,122,255,.18)}
-#cone-svg{display:none} /* retired */
+/* Google Maps — rimuovi branding */
+.gm-style-cc, .gm-bundled-control-on-bottom { display:none !important }
+.gmnoprint a, .gmnoprint span, .gm-style-cc { display:none }
 
-/* ── USER SVG (Google Maps style dot + cone) ── */
-#user-svg{ overflow:visible }
-/* hide leaflet's default blue dot since we draw our own */
-.u-dot{ display:none }
-
-/* old compass arrow — retired */
-#compass-arrow{ display:none }
 #route-bar{position:absolute;bottom:8px;left:8px;right:8px;z-index:9000;
   background:white;border-radius:11px;padding:9px 12px;
   box-shadow:0 2px 12px rgba(0,0,0,.1);display:none}
@@ -1033,7 +1020,7 @@ const SIM_MESSAGES = [
 ];
 
 // ━━━━━━━ STATE ━━━━━━━
-let map, uMark, rLayer, dMark, pLayers={};
+let map, uMarker, rPolyline, dMarker, pMarkers={};
 let uPos=null, places=[], selId=null;
 let mode='explore', filters=new Set(['all']);
 let heading=0;
@@ -1048,11 +1035,6 @@ let lastPushedPOIId=null;
 const OLLAMA_URL = 'https://domonique-procompensation-elvin.ngrok-free.dev';
 let ollamaIP = OLLAMA_URL;
 let ollamaEnabled = true;
-// Solo Content-Type — ngrok-skip-browser-warning causa errori CORS preflight
-const OLLAMA_HDR = {
-  'Content-Type': 'application/json',
-  'Accept': 'application/json'
-};
 let lastStreetName = '';
 let lastOllamaStreet = '';
 let ollamaIntervalId = null;
@@ -1060,28 +1042,66 @@ let ollamaLoading = false;
 let currentCountry = '';
 let currentCity = '';
 
-// ━━━━━━━ MAP ━━━━━━━
+// ━━━━━━━ MAP — Google Maps ━━━━━━━
 function initMap(lat,lng){
-  if(map){map.setView([lat,lng],16);return;}
-  map=L.map('map',{zoomControl:true,attributionControl:false}).setView([lat,lng],16);
-  L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png',{maxZoom:19}).addTo(map);
-  map.on('click',onMapClick);
-  map.on('move zoom',()=>{updateCone();renderOrbs();});
+  if(map){ map.panTo({lat,lng}); return; }
+  map = new google.maps.Map(document.getElementById('map'),{
+    center:{lat,lng}, zoom:16,
+    disableDefaultUI: true,
+    zoomControl: true,
+    zoomControlOptions:{ position: google.maps.ControlPosition.RIGHT_CENTER },
+    styles:[
+      {featureType:'poi',stylers:[{visibility:'off'}]},
+      {featureType:'transit',stylers:[{visibility:'off'}]},
+      {elementType:'labels.icon',stylers:[{visibility:'off'}]},
+      {featureType:'road',elementType:'geometry',stylers:[{color:'#ffffff'}]},
+      {featureType:'road',elementType:'labels.text.fill',stylers:[{color:'#9e9e9e'}]},
+      {featureType:'landscape',stylers:[{color:'#f5f5f5'}]},
+      {featureType:'water',stylers:[{color:'#c9d6e3'}]},
+      {featureType:'administrative',elementType:'labels.text.fill',stylers:[{color:'#6e6e73'}]}
+    ]
+  });
+  map.addListener('click', e => onMapClick(e));
+  map.addListener('bounds_changed', ()=>{ updateCone(); renderOrbs(); });
+  map.addListener('zoom_changed',   ()=>{ updateCone(); renderOrbs(); });
 }
+
 function placeUser(lat,lng){
-  const ic=L.divIcon({className:'',html:'<div class="u-dot"></div>',iconSize:[12,12],iconAnchor:[6,6]});
-  if(uMark){uMark.setLatLng([lat,lng]);return;}
-  uMark=L.marker([lat,lng],{icon:ic,zIndexOffset:999}).addTo(map);
+  if(uMarker){ uMarker.setPosition({lat,lng}); return; }
+  uMarker = new google.maps.Marker({
+    position:{lat,lng}, map,
+    icon:{ path:google.maps.SymbolPath.CIRCLE, scale:0 },
+    zIndex:999
+  });
 }
-function centerUser(){if(uPos&&map)map.flyTo([uPos.lat,uPos.lng],16,{duration:.8});}
+
+function centerUser(){
+  if(uPos&&map) map.panTo({lat:uPos.lat,lng:uPos.lng});
+}
 
 // ━━━━━━━ USER DOT + DIRECTION CONE (Google Maps style) ━━━━━━━
+function latLngToPixel(lat, lng){
+  if(!map) return {x:0,y:0};
+  const proj = map.getProjection();
+  if(!proj) return {x:0,y:0};
+  const bounds = map.getBounds();
+  if(!bounds) return {x:0,y:0};
+  const topRight = proj.fromLatLngToPoint(bounds.getNorthEast());
+  const bottomLeft = proj.fromLatLngToPoint(bounds.getSouthWest());
+  const scale = Math.pow(2, map.getZoom());
+  const worldPoint = proj.fromLatLngToPoint(new google.maps.LatLng(lat, lng));
+  const mapEl = document.getElementById('map');
+  return {
+    x: (worldPoint.x - bottomLeft.x) * scale,
+    y: (worldPoint.y - topRight.y) * scale
+  };
+}
+
 function updateCone(){
   if(!map||!uPos)return;
-  const pt=map.latLngToContainerPoint([uPos.lat,uPos.lng]);
+  const pt = latLngToPixel(uPos.lat, uPos.lng);
   const cx=pt.x, cy=pt.y;
 
-  // Show user dot
   const dotG=document.getElementById('user-dot-group');
   const outer=document.getElementById('ud-outer');
   const inner=document.getElementById('ud-inner');
@@ -1091,13 +1111,9 @@ function updateCone(){
   inner.setAttribute('cx',cx); inner.setAttribute('cy',cy);
   pulse.setAttribute('cx',cx); pulse.setAttribute('cy',cy);
 
-  // Hide leaflet's default marker (we draw our own)
-  if(uMark) uMark.setOpacity(0);
-
-  // Draw direction cone — 60° wide spicchio, 90px long
   const coneG=document.getElementById('cone-group');
   const conePath=document.getElementById('cone-path');
-  const CONE_LEN=90, CONE_HALF=30; // degrees half-angle
+  const CONE_LEN=90, CONE_HALF=30;
   const rad=Math.PI/180;
   const lAng=(heading-CONE_HALF-90)*rad;
   const rAng=(heading+CONE_HALF-90)*rad;
@@ -1105,12 +1121,7 @@ function updateCone(){
   const ly=cy+Math.sin(lAng)*CONE_LEN;
   const rx=cx+Math.cos(rAng)*CONE_LEN;
   const ry=cy+Math.sin(rAng)*CONE_LEN;
-  // Arc for the far edge
-  const lxA=cx+Math.cos(lAng)*CONE_LEN;
-  const lyA=cy+Math.sin(lAng)*CONE_LEN;
-  conePath.setAttribute('d',
-    `M${cx},${cy} L${lx},${ly} A${CONE_LEN},${CONE_LEN} 0 0,1 ${rx},${ry} Z`
-  );
+  conePath.setAttribute('d',`M${cx},${cy} L${lx},${ly} A${CONE_LEN},${CONE_LEN} 0 0,1 ${rx},${ry} Z`);
   coneG.style.display='';
 }
 
@@ -1149,12 +1160,10 @@ function requestGPS(){
       hideGpsIndicator();
       const{latitude:lat,longitude:lng}=p.coords;
       uPos={lat,lng,_r:true};
-      // Aggiorna fusion con dati GPS
       updateGpsHeading(p.coords);
-      // Se in movimento e GPS heading valido, aggiorna heading direttamente
       if(_isMoving && _gpsHeading != null){
-        const diff = ((_gpsHeading - heading + 540) % 360) - 180;
-        heading = (heading + 0.4 * diff + 360) % 360;
+        const diff=((_gpsHeading-heading+540)%360)-180;
+        heading=(heading+0.4*diff+360)%360;
       }
       placeUser(lat,lng); updateCone(); renderOrbs();
       if(mode==='navigate'&&rData)updateNav();
@@ -1179,13 +1188,10 @@ function requestCompass(){
   }
 }
 // ━━━━━━━ SENSOR FUSION HEADING ━━━━━━━
-// Strategia: GPS heading quando in movimento (più preciso),
-// giroscopio da fermo, filtro complementare per fondere i due.
-
-const FUSION_GPS_SPEED_THRESHOLD = 0.8; // m/s — sotto questa soglia usa giroscopio
-const FUSION_ALPHA_MOVING  = 0.5;  // reattivo quando in movimento
-const FUSION_ALPHA_STILL   = 0.08; // smussato quando fermo
-const FUSION_GPS_WEIGHT    = 0.7;  // peso GPS heading nella fusion
+const FUSION_GPS_SPEED_THRESHOLD = 0.8;
+const FUSION_ALPHA_MOVING  = 0.5;
+const FUSION_ALPHA_STILL   = 0.08;
+const FUSION_GPS_WEIGHT    = 0.7;
 
 let _rawHeading   = null;
 let _gpsHeading   = null;
@@ -1193,13 +1199,9 @@ let _gpsSpeed     = 0;
 let _lastOrientTime = 0;
 let _isMoving     = false;
 
-// Aggiorna heading GPS da watchPosition
 function updateGpsHeading(coords){
-  if(coords.heading != null && !isNaN(coords.heading)){
-    _gpsHeading = coords.heading;
-  }
-  // speed in m/s
-  if(coords.speed != null && !isNaN(coords.speed)){
+  if(coords.heading != null && !isNaN(coords.heading)) _gpsHeading = coords.heading;
+  if(coords.speed   != null && !isNaN(coords.speed)){
     _gpsSpeed = coords.speed;
     _isMoving = coords.speed > FUSION_GPS_SPEED_THRESHOLD;
   }
@@ -1207,34 +1209,25 @@ function updateGpsHeading(coords){
 
 function onOrient(e){
   const now = Date.now();
-  if(now - _lastOrientTime < 40) return; // 25fps max
+  if(now - _lastOrientTime < 40) return;
   _lastOrientTime = now;
 
   let raw = null;
-  if(e.webkitCompassHeading != null){
-    raw = e.webkitCompassHeading;
-  } else if(e.absolute && e.alpha != null){
-    raw = (360 - e.alpha + 360) % 360;
-  } else if(e.alpha != null){
-    raw = (360 - e.alpha + 360) % 360;
-  } else {
-    return;
-  }
+  if(e.webkitCompassHeading != null)       raw = e.webkitCompassHeading;
+  else if(e.absolute && e.alpha != null)   raw = (360 - e.alpha + 360) % 360;
+  else if(e.alpha != null)                 raw = (360 - e.alpha + 360) % 360;
+  else return;
 
-  // Smussamento del sensore grezzo (low-pass)
-  if(_rawHeading === null){
-    _rawHeading = raw;
-  } else {
+  if(_rawHeading === null){ _rawHeading = raw; }
+  else {
     let delta = raw - _rawHeading;
     if(delta > 180) delta -= 360;
     if(delta < -180) delta += 360;
     _rawHeading = (_rawHeading + delta + 360) % 360;
   }
 
-  // Fusion: se in movimento e GPS heading disponibile, fondi i due
   let target;
   if(_isMoving && _gpsHeading != null){
-    // Weighted average tra GPS e magnetometro sul percorso più corto
     let diff = _gpsHeading - _rawHeading;
     if(diff > 180) diff -= 360;
     if(diff < -180) diff += 360;
@@ -1243,7 +1236,6 @@ function onOrient(e){
     target = _rawHeading;
   }
 
-  // Filtro finale verso heading corrente
   const alpha = _isMoving ? FUSION_ALPHA_MOVING : FUSION_ALPHA_STILL;
   const diff = ((target - heading + 540) % 360) - 180;
   heading = (heading + alpha * diff + 360) % 360;
@@ -1560,7 +1552,7 @@ function renderOrbs(){
 
   visible.forEach(p=>{
     // is this POI visible on the map card?
-    const screenPt=map.latLngToContainerPoint([p.lat,p.lon]);
+    const screenPt = latLngToPixel(p.lat, p.lon);
     // screenPt is relative to map-card (leaflet container)
     // convert to zone coords: add cardLeft, cardTop
     const ptZX=screenPt.x+cardLeft, ptZY=screenPt.y+cardTop;
@@ -1605,17 +1597,24 @@ function borderPt(cx,cy,W,H,deg,pad){
 
 // ━━━━━━━ MAP PINS ━━━━━━━
 function renderPins(onRoute){
-  Object.values(pLayers).forEach(l=>map.removeLayer(l));pLayers={};
+  Object.values(pMarkers).forEach(m=>m.setMap(null)); pMarkers={};
   vp().forEach(p=>{
-    const html=`<div class="mp2${p.id===selId?' sel':''}" id="pin-${p.id}">
-      <div class="mpb"><span>${p.emoji}</span></div><div class="mpd"></div></div>`;
-    const ic=L.divIcon({className:'',html,iconSize:[26,36],iconAnchor:[13,36]});
-    const m=L.marker([p.lat,p.lon],{icon:ic}).addTo(map);
-    m.on('click',()=>{
-  selPOI(p.id);
-  openPOIPopup(p);
-});
-    pLayers[p.id]=m;
+    const marker = new google.maps.Marker({
+      position:{lat:p.lat,lng:p.lon}, map,
+      icon:{
+        url: `data:image/svg+xml;charset=UTF-8,${encodeURIComponent(`
+          <svg xmlns="http://www.w3.org/2000/svg" width="26" height="36">
+            <circle cx="13" cy="13" r="12" fill="white" stroke="${p.id===selId?'#1d1d1f':'rgba(0,0,0,0.1)'}" stroke-width="${p.id===selId?'2':'1'}"/>
+            <text x="13" y="18" text-anchor="middle" font-size="14">${p.emoji}</text>
+            <circle cx="13" cy="34" r="2" fill="rgba(0,0,0,0.2)"/>
+          </svg>`)}`,
+        scaledSize: new google.maps.Size(26,36),
+        anchor: new google.maps.Point(13,36)
+      },
+      zIndex: p.id===selId ? 999 : 1
+    });
+    marker.addListener('click',()=>{ selPOI(p.id); openPOIPopup(p); });
+    pMarkers[p.id]=marker;
   });
 }
 
@@ -1793,16 +1792,21 @@ Rispondi in italiano, in modo preciso e coinvolgente (max 60 parole): ${question
   if(btn){ btn.classList.add('loading'); btn.textContent='⏳ Caricando…'; }
 
   try{
-    const res = await fetch(`${ollamaBaseUrl()}/api/generate`,{
-      method:'POST', headers:OLLAMA_HDR,
-      body:JSON.stringify({model:'llama3.2',prompt,stream:false,options:{temperature:0.8,num_predict:120}}),
+    const res = await fetch(N8N_URL, {
+      method:'POST',
+      headers:{'Content-Type':'application/json','Accept':'application/json'},
+      body:JSON.stringify({
+        street: street,
+        city: currentCity,
+        country: currentCountry,
+        question: question || null
+      }),
       signal:AbortSignal.timeout(60000)
     });
     if(!res.ok) throw new Error('HTTP '+res.status);
     const data = await res.json();
-    const text = data.response?.trim();
+    const text = data.text?.trim() || data.response?.trim();
     if(text){
-      // Push a new timeline card with the answer
       pushTL({type:'cur',emoji:'💬',title:question||'Approfondimento',text,isOllama:true});
     }
   }catch(e){
@@ -1827,8 +1831,7 @@ function toggleSettings(){
 
 function centerMap(){
   if(!map || !uPos) return;
-  map.invalidateSize({animate:false, pan:false});
-  map.setView([uPos.lat, uPos.lng], map.getZoom(), {animate:false});
+  map.panTo({lat:uPos.lat, lng:uPos.lng});
 }
 
 // ── GRAB HANDLE — resize map-row height ──
@@ -1975,23 +1978,37 @@ function showSug(l){
 function hideSug(){document.getElementById('sugg').style.display='none';}
 function clearSrch(){document.getElementById('si').value='';hideSug();}
 function onMapClick(e){
-
-closePOIPopup();
-if(mode!=='navigate')return;startNav({name:'Punto sulla mappa',lat:e.latlng.lat,lng:e.latlng.lng});}
+  closePOIPopup();
+  if(mode!=='navigate') return;
+  startNav({name:'Punto sulla mappa', lat:e.latLng.lat(), lng:e.latLng.lng()});
+}
 
 // ━━━━━━━ NAVIGATION ━━━━━━━
 async function startNav(dest){
   hideSug();clearSrch();
   document.getElementById('route-bar').style.display='block';
   document.getElementById('rb-dn').textContent=dest.name;
-  if(dMark)map.removeLayer(dMark);
-  const di=L.divIcon({className:'',html:`<div class="dest-pin"><div class="dest-flag">🏁</div><div class="dest-d"></div></div>`,iconSize:[24,32],iconAnchor:[12,32]});
-  dMark=L.marker([dest.lat,dest.lng],{icon:di,zIndexOffset:500}).addTo(map);
-  let coords;if(ORS_KEY)coords=await fetchORS(uPos.lat,uPos.lng,dest.lat,dest.lng);
-  if(!coords)coords=simRoute(uPos.lat,uPos.lng,dest.lat,dest.lng);
-  if(rLayer)map.removeLayer(rLayer);
-  rLayer=L.polyline(coords,{color:'#007AFF',weight:4,opacity:.6,lineCap:'round',lineJoin:'round'}).addTo(map);
-  map.fitBounds(rLayer.getBounds(),{padding:[60,60]});
+  if(dMarker) dMarker.setMap(null);
+  dMarker = new google.maps.Marker({
+    position:{lat:dest.lat,lng:dest.lng}, map,
+    icon:{
+      url:`data:image/svg+xml;charset=UTF-8,${encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" width="24" height="32"><rect x="2" y="2" width="20" height="20" rx="4" fill="#1d1d1f"/><text x="12" y="17" text-anchor="middle" font-size="13">🏁</text><circle cx="12" cy="30" r="2" fill="rgba(0,0,0,0.3)"/></svg>')}`,
+      scaledSize: new google.maps.Size(24,32),
+      anchor: new google.maps.Point(12,32)
+    }, zIndex:500
+  });
+  let coords; if(ORS_KEY) coords=await fetchORS(uPos.lat,uPos.lng,dest.lat,dest.lng);
+  if(!coords) coords=simRoute(uPos.lat,uPos.lng,dest.lat,dest.lng);
+  if(rPolyline) rPolyline.setMap(null);
+  rPolyline = new google.maps.Polyline({
+    path: coords.map(c=>({lat:c[0],lng:c[1]})),
+    strokeColor:'#007AFF', strokeOpacity:.7, strokeWeight:4,
+    map
+  });
+  // fitBounds
+  const bounds = new google.maps.LatLngBounds();
+  coords.forEach(c=>bounds.extend({lat:c[0],lng:c[1]}));
+  map.fitBounds(bounds, {top:60,right:60,bottom:60,left:60});
   const along=findAlong(coords);
   const td=rLen(coords),tm=Math.round(td/80);
   document.getElementById('rb-dist').textContent=fmt(td);
@@ -2040,149 +2057,40 @@ function updateNav(){
 }
 function cancelRoute(silent){
   if(simNavI)clearInterval(simNavI);rData=null;simNavP=0;
-  if(rLayer){map.removeLayer(rLayer);rLayer=null;}
-  if(dMark){map.removeLayer(dMark);dMark=null;}
+  if(rPolyline){rPolyline.setMap(null);rPolyline=null;}
+  if(dMarker){dMarker.setMap(null);dMarker=null;}
   document.getElementById('rb-fill').style.width='0%';
   document.getElementById('route-bar').style.display='none';
   buildTL();if(!silent)setMode('explore');
 }
 
-// ━━━━━━━ OLLAMA ━━━━━━━
 
-// ollamaIP can be either:
-//   "192.168.1.45"            → local WiFi  → http://192.168.1.45:11434
-//   "https://xxxx.trycloudflare.com" → tunnel → use as-is
-function ollamaBaseUrl(){
-  if(!ollamaIP) return '';
-  // If it already looks like a full URL, use it directly
-  if(ollamaIP.startsWith('http://') || ollamaIP.startsWith('https://')){
-    return ollamaIP.replace(/\/+$/,''); // strip trailing slash
-  }
-  // Otherwise treat as bare IP
-  return `http://${ollamaIP}:11434`;
-}
-
-// Tab switching in modal
-let ollamaTab = localStorage.getItem('ollama_tab') || 'local';
-function switchOllamaTab(tab){
-  ollamaTab = tab;
-  localStorage.setItem('ollama_tab', tab);
-  document.getElementById('tab-local').className  = 'os-tab' + (tab==='local'?' active':'');
-  document.getElementById('tab-tunnel').className = 'os-tab' + (tab==='tunnel'?' active':'');
-  document.getElementById('os-panel-local').style.display  = tab==='local'  ? '' : 'none';
-  document.getElementById('os-panel-tunnel').style.display = tab==='tunnel' ? '' : 'none';
-}
-
-function updateOllamaPill(){
-  const pill=document.getElementById('ollama-pill');
-  if(!pill)return;
-  if(ollamaEnabled&&ollamaIP){
-    pill.textContent='🤖 AI attiva';
-    pill.className='ollama-pill on';
-  } else {
-    pill.textContent='🤖 Connetti AI';
-    pill.className='ollama-pill';
-  }
-}
-
-function openOllamaModal(){
-  // Restore last saved values into correct fields
-  const savedIP = localStorage.getItem('ollama_ip')||'';
-  const savedTab = localStorage.getItem('ollama_tab')||'local';
-  switchOllamaTab(savedTab);
-  if(savedTab==='local'){
-    document.getElementById('ollama-local-input').value = savedIP;
-  } else {
-    document.getElementById('ollama-tunnel-input').value = savedIP;
-  }
-  document.getElementById('ollama-modal').classList.add('vis');
-}
-function closeOllamaModal(){
-  document.getElementById('ollama-modal').classList.remove('vis');
-}
-
-async function saveOllamaConfig(){
-  const isTunnel = ollamaTab === 'tunnel';
-  const val = isTunnel
-    ? document.getElementById('ollama-tunnel-input').value.trim()
-    : document.getElementById('ollama-local-input').value.trim();
-
-  if(!val){ showOllamaToast('⚠️ Inserisci un indirizzo'); return; }
-
-  // Validate: tunnel must start with https://
-  if(isTunnel && !val.startsWith('http')){
-    showOllamaToast('⚠️ Incolla l\'URL completo con https://');
-    return;
-  }
-
-  ollamaIP = val;
-  localStorage.setItem('ollama_ip', val);
-  localStorage.setItem('ollama_tab', ollamaTab);
-  ollamaEnabled = true;
-  updateOllamaPill();
-
-  // Show testing state
-  const btn = document.querySelector('.os-save');
-  btn.textContent = 'Connessione in corso…';
-  btn.disabled = true;
-
-  const ok = await testOllama();
-  btn.textContent = 'Connetti e testa';
-  btn.disabled = false;
-
-  if(ok){
-    closeOllamaModal();
-    showOllamaToast('✓ Ollama connesso — carico modello in GPU…');
-    warmupOllama().then(()=>{
-      showOllamaToast('✓ llama3.2 pronto');
-      startOllamaInterval();
-      if(lastStreetName) triggerOllamaForStreet(lastStreetName);
-    });
-  } else {
-    const hint = isTunnel
-      ? 'Controlla che il tunnel sia avviato e l\'URL sia aggiornato'
-      : 'Controlla IP, stessa WiFi, e che Ollama sia avviato con OLLAMA_ORIGINS=*';
-    showOllamaToast(`✗ Connessione fallita — ${hint}`);
-  }
-}
-
-async function testOllama(){
-  try{
-    const r=await fetch(`${ollamaBaseUrl()}/api/tags`,{headers:OLLAMA_HDR,signal:AbortSignal.timeout(6000)});
-    return r.ok;
-  }catch{return false;}
-}
-
-// Build the prompt for a street name
-// Fetch Wikipedia summary — best-effort, max 4s, never blocks Ollama
 // ━━━━━━━ N8N AGENT ━━━━━━━
 const N8N_URL = 'https://domonique-procompensation-elvin.ngrok-free.dev/webhook/locus-narrate';
 
-async function callN8NAgent(streetName, quarter){
+async function callN8NAgent(streetName){
   if(ollamaLoading) return null;
   ollamaLoading = true;
   dbg(`→ n8n: "${streetName}"`, 'req');
   try{
     const res = await fetch(N8N_URL, {
-      method: 'POST',
-      headers: {'Content-Type':'application/json','Accept':'application/json'},
-      body: JSON.stringify({street:streetName, city:currentCity, country:currentCountry}),
-      signal: AbortSignal.timeout(60000)
+      method:'POST',
+      headers:{'Content-Type':'application/json','Accept':'application/json'},
+      body:JSON.stringify({street:streetName, city:currentCity, country:currentCountry}),
+      signal:AbortSignal.timeout(60000)
     });
-    if(!res.ok){ dbg(`✗ n8n HTTP ${res.status}`,'err'); return null; }
+    if(!res.ok){ dbg(`✗ HTTP ${res.status}`,'err'); return null; }
     const data = await res.json();
     if(data.success && data.text){
-      dbg(`✓ ${data.text.length} chars | src:${data.sourceUsed}`,'ok');
+      dbg(`✓ ${data.text.length} chars | src:${data.sourceUsed||'?'}`,'ok');
       return data;
     }
-    dbg(`✗ n8n: ${data.error||'risposta vuota'}`,'err');
+    dbg(`✗ ${data.error||'risposta vuota'}`,'err');
     return null;
   }catch(e){
-    dbg(`✗ n8n: ${e.name==='TimeoutError'?'timeout 60s':e.message}`,'err');
+    dbg(`✗ ${e.name==='TimeoutError'?'timeout 60s':e.message}`,'err');
     return null;
-  }finally{
-    ollamaLoading = false;
-  }
+  }finally{ ollamaLoading=false; }
 }
 
 function toggleDbg(){
@@ -2195,25 +2103,24 @@ function toggleDbg(){
 }
 function updateDbgUrl(){
   const el=document.getElementById('ollama-dbg-url');
-  if(!el)return;
-  el.textContent=`URL attivo: ${N8N_URL}`;
+  if(el) el.textContent=`n8n: ${N8N_URL}`;
 }
 function applyDbgUrl(){
   const val=document.getElementById('dbg-url-input')?.value?.trim();
   if(!val){dbg('Inserisci un URL','err');return;}
-  window._n8nUrlOverride=val;
-  dbg(`✓ URL aggiornato → ${val}`,'ok');
+  window._n8nUrl=val;
+  dbg(`URL → ${val}`,'ok');
   lastOllamaStreet='';
-  if(lastStreetName) triggerOllamaForStreet(lastStreetName, document.getElementById('sb-acc')?.textContent||'');
+  if(lastStreetName) triggerOllamaForStreet(lastStreetName);
 }
 async function testOllamaManual(){
   updateDbgUrl();
   dbg(`Test → ${N8N_URL}`,'req');
   try{
-    const res=await fetch(N8N_URL,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({street:'Test',city:'Milano',country:'Italia'}),signal:AbortSignal.timeout(10000)});
-    if(res.ok){ const d=await res.json(); dbg(`✓ n8n ok — success:${d.success}`,'ok'); if(d.text) dbg(`  "${d.text.slice(0,60)}…"`,'ok'); }
+    const res=await fetch(N8N_URL,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({street:'Test',city:'Milano',country:'Italia'}),signal:AbortSignal.timeout(12000)});
+    if(res.ok){const d=await res.json();dbg(`✓ ok — success:${d.success}`,'ok');if(d.text)dbg(`"${d.text.slice(0,60)}…"`,'ok');}
     else dbg(`✗ HTTP ${res.status}`,'err');
-  }catch(e){ dbg(`✗ ${e.message}`,'err'); }
+  }catch(e){dbg(`✗ ${e.message}`,'err');}
 }
 
 function dbg(msg, type='info'){
@@ -2230,15 +2137,15 @@ function dbg(msg, type='info'){
   console.log(`[n8n ${type}]`,msg);
 }
 
-async function warmupOllama(){ dbg('n8n agent pronto','info'); }
+async function warmupOllama(){ dbg('n8n pronto','info'); }
 
 async function triggerOllamaForStreet(streetName, quarter=''){
-  if(!streetName||streetName===lastOllamaStreet)return;
+  if(!streetName||streetName===lastOllamaStreet) return;
   lastOllamaStreet=streetName;
   dbg(`trigger: "${streetName}"`,'info');
   const loadingId='ollama-'+Date.now();
   pushTL({id:loadingId,type:'cur',emoji:'<svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24"><path fill="currentColor" d="m20.713 7.128l-.246.566a.506.506 0 0 1-.934 0l-.246-.566a4.36 4.36 0 0 0-2.22-2.25l-.759-.339a.53.53 0 0 1 0-.963l.717-.319A4.37 4.37 0 0 0 19.276.931L19.53.32a.506.506 0 0 1 .942 0l.253.61a4.37 4.37 0 0 0 2.25 2.327l.718.32a.53.53 0 0 1 0 .962l-.76.338a4.36 4.36 0 0 0-2.219 2.251M8.5 6h-2v12h2zM4 10H2v4h2zm9-8h-2v20h2zm4.5 6h-2v10h2zm4.5 2h-2v4h2z"/></svg>',title:streetName,text:null,loading:true,isOllama:true});
-  const result=await callN8NAgent(streetName,quarter);
+  const result=await callN8NAgent(streetName);
   if(result){
     tlEntries=tlEntries.map(e=>e.id===loadingId?{...e,text:result.text,loading:false,wikiUsed:result.wikiUsed}:e);
     renderTLEntries();
