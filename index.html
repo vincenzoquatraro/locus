@@ -793,7 +793,7 @@ html,body{height:100%;height:100dvh;overflow:hidden;background:var(--off);
       </div>
       <div class="sp-title">Raggio</div>
       <div id="radius-row">
-        <input type="range" id="radius-slider" min="200" max="5000" step="200" value=200"
+        <input type="range" id="radius-slider" min="200" max="5000" step="200" value="600"
                oninput="onRadiusInput(this.value)" onchange="setRadius(+this.value)"
                style="width:100%">
         <div style="display:flex;justify-content:space-between;margin-top:4px">
@@ -1147,9 +1147,15 @@ function requestGPS(){
   navigator.geolocation.watchPosition(
     p=>{
       hideGpsIndicator();
-      const{latitude:lat,longitude:lng,heading:h}=p.coords;
+      const{latitude:lat,longitude:lng}=p.coords;
       uPos={lat,lng,_r:true};
-      if(h!=null)heading=h;
+      // Aggiorna fusion con dati GPS
+      updateGpsHeading(p.coords);
+      // Se in movimento e GPS heading valido, aggiorna heading direttamente
+      if(_isMoving && _gpsHeading != null){
+        const diff = ((_gpsHeading - heading + 540) % 360) - 180;
+        heading = (heading + 0.4 * diff + 360) % 360;
+      }
       placeUser(lat,lng); updateCone(); renderOrbs();
       if(mode==='navigate'&&rData)updateNav();
       fetchStreet(lat,lng);
@@ -1172,15 +1178,36 @@ function requestCompass(){
     window.addEventListener('deviceorientation',onOrient,true);
   }
 }
-// Low-pass filter for compass — α=0.15 smooths jitter without lag
-const COMPASS_ALPHA = 0.25; // responsive ma smussato
-let _rawHeading = null;
+// ━━━━━━━ SENSOR FUSION HEADING ━━━━━━━
+// Strategia: GPS heading quando in movimento (più preciso),
+// giroscopio da fermo, filtro complementare per fondere i due.
+
+const FUSION_GPS_SPEED_THRESHOLD = 0.8; // m/s — sotto questa soglia usa giroscopio
+const FUSION_ALPHA_MOVING  = 0.5;  // reattivo quando in movimento
+const FUSION_ALPHA_STILL   = 0.08; // smussato quando fermo
+const FUSION_GPS_WEIGHT    = 0.7;  // peso GPS heading nella fusion
+
+let _rawHeading   = null;
+let _gpsHeading   = null;
+let _gpsSpeed     = 0;
 let _lastOrientTime = 0;
+let _isMoving     = false;
+
+// Aggiorna heading GPS da watchPosition
+function updateGpsHeading(coords){
+  if(coords.heading != null && !isNaN(coords.heading)){
+    _gpsHeading = coords.heading;
+  }
+  // speed in m/s
+  if(coords.speed != null && !isNaN(coords.speed)){
+    _gpsSpeed = coords.speed;
+    _isMoving = coords.speed > FUSION_GPS_SPEED_THRESHOLD;
+  }
+}
 
 function onOrient(e){
-  // Throttle a 50ms (20fps) — abbastanza veloce, no jitter da flood
   const now = Date.now();
-  if(now - _lastOrientTime < 50) return;
+  if(now - _lastOrientTime < 40) return; // 25fps max
   _lastOrientTime = now;
 
   let raw = null;
@@ -1194,17 +1221,33 @@ function onOrient(e){
     return;
   }
 
-  if(_rawHeading === null){ _rawHeading = raw; heading = raw; }
-  else {
-    // Shortest-path delta per gestire il wraparound 359°→0°
+  // Smussamento del sensore grezzo (low-pass)
+  if(_rawHeading === null){
+    _rawHeading = raw;
+  } else {
     let delta = raw - _rawHeading;
     if(delta > 180) delta -= 360;
     if(delta < -180) delta += 360;
     _rawHeading = (_rawHeading + delta + 360) % 360;
-    // Low-pass filter: segue rapidamente grandi rotazioni, smussato su piccole
-    const diff = ((_rawHeading - heading + 540) % 360) - 180;
-    heading = (heading + COMPASS_ALPHA * diff + 360) % 360;
   }
+
+  // Fusion: se in movimento e GPS heading disponibile, fondi i due
+  let target;
+  if(_isMoving && _gpsHeading != null){
+    // Weighted average tra GPS e magnetometro sul percorso più corto
+    let diff = _gpsHeading - _rawHeading;
+    if(diff > 180) diff -= 360;
+    if(diff < -180) diff += 360;
+    target = (_rawHeading + FUSION_GPS_WEIGHT * diff + 360) % 360;
+  } else {
+    target = _rawHeading;
+  }
+
+  // Filtro finale verso heading corrente
+  const alpha = _isMoving ? FUSION_ALPHA_MOVING : FUSION_ALPHA_STILL;
+  const diff = ((target - heading + 540) % 360) - 180;
+  heading = (heading + alpha * diff + 360) % 360;
+
   updateCone();
   renderOrbs();
 }
@@ -2113,7 +2156,6 @@ async function testOllama(){
 // Build the prompt for a street name
 // Fetch Wikipedia summary — best-effort, max 4s, never blocks Ollama
 // ━━━━━━━ N8N AGENT ━━━━━━━
-// n8n esposto via ngrok — Ollama gira in localhost contattato da n8n
 const N8N_URL = 'https://domonique-procompensation-elvin.ngrok-free.dev/webhook/locus-narrate';
 
 async function callN8NAgent(streetName, quarter){
@@ -2124,27 +2166,19 @@ async function callN8NAgent(streetName, quarter){
     const res = await fetch(N8N_URL, {
       method: 'POST',
       headers: {'Content-Type':'application/json','Accept':'application/json'},
-      body: JSON.stringify({
-        street: streetName,
-        city: currentCity,
-        country: currentCountry
-      }),
+      body: JSON.stringify({street:streetName, city:currentCity, country:currentCountry}),
       signal: AbortSignal.timeout(60000)
     });
-    if(!res.ok){
-      dbg(`✗ n8n HTTP ${res.status}`, 'err');
-      return null;
-    }
+    if(!res.ok){ dbg(`✗ n8n HTTP ${res.status}`,'err'); return null; }
     const data = await res.json();
     if(data.success && data.text){
-      dbg(`✓ ${data.text.length} chars | wiki:${data.wikiUsed} osm:${data.osmUsed}`, 'ok');
+      dbg(`✓ ${data.text.length} chars | src:${data.sourceUsed}`,'ok');
       return data;
     }
-    dbg(`✗ n8n: ${data.error||'risposta vuota'}`, 'err');
+    dbg(`✗ n8n: ${data.error||'risposta vuota'}`,'err');
     return null;
   }catch(e){
-    const msg = e.name==='TimeoutError' ? 'timeout 60s' : e.message;
-    dbg(`✗ n8n: ${msg}`, 'err');
+    dbg(`✗ n8n: ${e.name==='TimeoutError'?'timeout 60s':e.message}`,'err');
     return null;
   }finally{
     ollamaLoading = false;
@@ -2167,39 +2201,21 @@ function updateDbgUrl(){
 function applyDbgUrl(){
   const val=document.getElementById('dbg-url-input')?.value?.trim();
   if(!val){dbg('Inserisci un URL','err');return;}
-  // Permette di sovrascrivere l'URL n8n a runtime
-  window._n8nUrlOverride = val;
+  window._n8nUrlOverride=val;
   dbg(`✓ URL aggiornato → ${val}`,'ok');
-  updateDbgUrl();
   lastOllamaStreet='';
-  if(lastStreetName){
-    const q=document.getElementById('sb-acc')?.textContent||'';
-    triggerOllamaForStreet(lastStreetName,q);
-  }
+  if(lastStreetName) triggerOllamaForStreet(lastStreetName, document.getElementById('sb-acc')?.textContent||'');
 }
 async function testOllamaManual(){
   updateDbgUrl();
-  dbg(`Test connessione → ${N8N_URL}`,'req');
+  dbg(`Test → ${N8N_URL}`,'req');
   try{
-    const res = await fetch(N8N_URL, {
-      method:'POST',
-      headers:{'Content-Type':'application/json','Accept':'application/json'},
-      body: JSON.stringify({street:'Test', city:'Milano', country:'Italia'}),
-      signal: AbortSignal.timeout(10000)
-    });
-    if(res.ok){
-      const d = await res.json();
-      dbg(`✓ n8n risponde — success:${d.success}`,'ok');
-      if(d.text) dbg(`  "${d.text.slice(0,60)}…"`,'ok');
-    } else {
-      dbg(`✗ HTTP ${res.status}`,'err');
-    }
-  }catch(e){
-    dbg(`✗ ${e.message}`,'err');
-  }
+    const res=await fetch(N8N_URL,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({street:'Test',city:'Milano',country:'Italia'}),signal:AbortSignal.timeout(10000)});
+    if(res.ok){ const d=await res.json(); dbg(`✓ n8n ok — success:${d.success}`,'ok'); if(d.text) dbg(`  "${d.text.slice(0,60)}…"`,'ok'); }
+    else dbg(`✗ HTTP ${res.status}`,'err');
+  }catch(e){ dbg(`✗ ${e.message}`,'err'); }
 }
 
-// ── DEBUG LOG (visible in-app) ──
 function dbg(msg, type='info'){
   const el=document.getElementById('ollama-dbg-log');
   if(!el)return;
@@ -2209,35 +2225,29 @@ function dbg(msg, type='info'){
   const line=document.createElement('div');
   line.style.cssText=`color:${colors[type]||colors.info};padding:2px 0;border-bottom:1px solid #f0f0f0;word-break:break-all`;
   line.textContent=`${ts} ${msg}`;
-  el.insertBefore(line, el.firstChild);
+  el.insertBefore(line,el.firstChild);
   while(el.children.length>20) el.removeChild(el.lastChild);
-  console.log(`[n8n ${type}]`, msg);
+  console.log(`[n8n ${type}]`,msg);
 }
 
-async function warmupOllama(){
-  dbg('n8n agent pronto', 'info');
-}
+async function warmupOllama(){ dbg('n8n agent pronto','info'); }
 
 async function triggerOllamaForStreet(streetName, quarter=''){
   if(!streetName||streetName===lastOllamaStreet)return;
   lastOllamaStreet=streetName;
-  dbg(`trigger: "${streetName}"`, 'info');
-
+  dbg(`trigger: "${streetName}"`,'info');
   const loadingId='ollama-'+Date.now();
   pushTL({id:loadingId,type:'cur',emoji:'<svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24"><path fill="currentColor" d="m20.713 7.128l-.246.566a.506.506 0 0 1-.934 0l-.246-.566a4.36 4.36 0 0 0-2.22-2.25l-.759-.339a.53.53 0 0 1 0-.963l.717-.319A4.37 4.37 0 0 0 19.276.931L19.53.32a.506.506 0 0 1 .942 0l.253.61a4.37 4.37 0 0 0 2.25 2.327l.718.32a.53.53 0 0 1 0 .962l-.76.338a4.36 4.36 0 0 0-2.219 2.251M8.5 6h-2v12h2zM4 10H2v4h2zm9-8h-2v20h2zm4.5 6h-2v10h2zm4.5 2h-2v4h2z"/></svg>',title:streetName,text:null,loading:true,isOllama:true});
-
-  const result = await callN8NAgent(streetName, quarter);
+  const result=await callN8NAgent(streetName,quarter);
   if(result){
     tlEntries=tlEntries.map(e=>e.id===loadingId?{...e,text:result.text,loading:false,wikiUsed:result.wikiUsed}:e);
     renderTLEntries();
   } else {
-    tlEntries=tlEntries.map(e=>e.id===loadingId
-      ?{...e,text:'⚠️ Agente non raggiungibile — controlla n8n e ngrok',loading:false}:e);
+    tlEntries=tlEntries.map(e=>e.id===loadingId?{...e,text:'⚠️ Agente non raggiungibile — controlla n8n e ngrok',loading:false}:e);
     renderTLEntries();
   }
 }
 
-// Start 30-second interval — DISABLED, only street-change triggers now
 function startOllamaInterval(){ /* no-op */ }
 function stopOllamaInterval(){
   if(ollamaIntervalId)clearInterval(ollamaIntervalId);
