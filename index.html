@@ -2002,25 +2002,33 @@ async function startNav(dest){
       anchor: new google.maps.Point(12,32)
     }, zIndex:500
   });
-  let coords; if(ORS_KEY) coords=await fetchORS(uPos.lat,uPos.lng,dest.lat,dest.lng);
-  if(!coords) coords=simRoute(uPos.lat,uPos.lng,dest.lat,dest.lng);
+  // Google Maps Directions API — percorso pedonale reale
+  let coords;
+  try {
+    coords = await fetchGoogleRoute(uPos.lat, uPos.lng, dest.lat, dest.lng);
+  } catch(e) {
+    coords = null;
+  }
+  if(!coords || coords.length < 2) {
+    coords = simRoute(uPos.lat, uPos.lng, dest.lat, dest.lng);
+  }
+
   if(rPolyline) rPolyline.setMap(null);
   rPolyline = new google.maps.Polyline({
     path: coords.map(c=>({lat:c[0],lng:c[1]})),
-    strokeColor:'#007AFF', strokeOpacity:.7, strokeWeight:4,
+    strokeColor:'#007AFF', strokeOpacity:.8, strokeWeight:5,
     map
   });
-  // fitBounds
   const bounds = new google.maps.LatLngBounds();
   coords.forEach(c=>bounds.extend({lat:c[0],lng:c[1]}));
-  map.fitBounds(bounds, {top:60,right:60,bottom:60,left:60});
+  map.fitBounds(bounds, {top:80,right:40,bottom:80,left:40});
   const along=findAlong(coords);
-  const td=rLen(coords),tm=Math.round(td/80);
+  const td=rLen(coords), tm=Math.round(td/80);
   document.getElementById('rb-dist').textContent=fmt(td);
   document.getElementById('rb-time').textContent=tm<60?`${tm} min`:`${Math.floor(tm/60)}h ${tm%60}m`;
   document.getElementById('rb-poi').textContent=along.length;
   rData={dest,coords,pois:along,td};
-  renderPins(along.map(p=>p.id));buildTLnav(along);startNavSim(td);
+  renderPins(along.map(p=>p.id)); buildTLnav(along); startNavSim(td);
 }
 function buildTLnav(along){
   tlEntries=[{type:'cur',emoji:'📍',time:nt(),title:'Inizio percorso',text:'Stai per partire. Le tappe ti aspettano lungo il percorso.'}];
@@ -2029,9 +2037,22 @@ function buildTLnav(along){
     title:p.name,text:p.text,dist:p._rd,dir:'→'}));
   renderTLEntries();
 }
-async function fetchORS(a,b,c,d){
-  try{const r=await fetch(`https://api.openrouteservice.org/v2/directions/foot-walking?api_key=${ORS_KEY}&start=${b},${a}&end=${d},${c}`);
-    const j=await r.json();return j.features[0].geometry.coordinates.map(x=>[x[1],x[0]]);}catch{return null;}
+// Google Maps Directions API — percorso pedonale reale
+async function fetchGoogleRoute(fromLat, fromLng, toLat, toLng){
+  return new Promise((resolve, reject)=>{
+    const service = new google.maps.DirectionsService();
+    service.route({
+      origin: {lat: fromLat, lng: fromLng},
+      destination: {lat: toLat, lng: toLng},
+      travelMode: google.maps.TravelMode.WALKING
+    }, (result, status)=>{
+      if(status !== 'OK'){ reject(new Error(status)); return; }
+      // Decodifica i punti dell'itinerario
+      const path = result.routes[0].overview_path;
+      const coords = path.map(p=>[p.lat(), p.lng()]);
+      resolve(coords);
+    });
+  });
 }
 function simRoute(la,lo,la2,lo2){
   const n=30,c=[];
