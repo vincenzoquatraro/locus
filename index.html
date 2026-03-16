@@ -721,7 +721,7 @@ html,body{height:100%;height:100dvh;overflow:hidden;background:var(--off);
 }
 .tl-wiki-img{
   width:100%;
-  max-height:130px;
+  max-height:160px;
   height:auto;
   border-radius:8px;
   object-fit:cover;
@@ -1039,6 +1039,10 @@ ollama serve</div>
 
 function closePOIPopup(){
   document.getElementById('poi-popup').style.display='none';
+  // Torna a seguire l'utente
+  _poiSelectedId = null;
+  if(_poiReturnTimer){ clearTimeout(_poiReturnTimer); _poiReturnTimer=null; }
+  if(uPos&&map) map.panTo({lat:uPos.lat, lng:uPos.lng});
 }
 
 function goToPOI(id){
@@ -1136,6 +1140,9 @@ function placeUser(lat,lng){
 }
 
 function centerUser(){
+  _followUser = true;
+  _poiSelectedId = null;
+  if(_poiReturnTimer){ clearTimeout(_poiReturnTimer); _poiReturnTimer=null; }
   if(uPos&&map) map.panTo({lat:uPos.lat,lng:uPos.lng});
 }
 
@@ -1215,6 +1222,11 @@ function requestGPS(){
     },
     {enableHighAccuracy:true, timeout:14000, maximumAge:0}
   );
+// ── auto-follow: true = mappa segue utente, false = utente ha spostato la mappa
+let _followUser = true;
+let _poiSelectedId = null;
+let _poiReturnTimer = null;
+
   navigator.geolocation.watchPosition(
     p=>{
       hideGpsIndicator();
@@ -1228,6 +1240,15 @@ function requestGPS(){
       placeUser(lat,lng); updateCone(); renderOrbs();
       if(mode==='navigate'&&rData)updateNav();
       fetchStreet(lat,lng);
+      // Aggiorna posizione sulla mappa
+      if(_followUser && map){
+        if(_poiSelectedId !== null){
+          // POI selezionato — fitBounds tra utente e POI
+          _fitUserAndPOI(_poiSelectedId);
+        } else {
+          map.panTo({lat, lng});
+        }
+      }
     },
     ()=>{},
     {enableHighAccuracy:true}
@@ -1771,7 +1792,7 @@ function renderTLEntries(){
         ${!last?`<div class="tl-ln${e.type==='fut'?' dash':''}"></div>`:''}
       </div>
       <div class="tl-b">
-        <div class="tl-t">${currentCity} · ${e.time||nt()}</div>
+        <div class="tl-t">${e.time||nt()}</div>
         <div class="tl-title" id="tl-title-${eid2}">${e.title}</div>
         ${contentRow}
         <div id="after-${eid2}"></div>
@@ -2027,14 +2048,37 @@ function setupSwipe(){}
 
 
 // ━━━━━━━ SELECT ━━━━━━━
+function _fitUserAndPOI(id){
+  if(!map||!uPos) return;
+  const p = places.find(x=>x.id===id);
+  if(!p) return;
+  const lat = parseFloat(p.lat);
+  const lng = parseFloat(p.lon ?? p.lng);
+  if(!isFinite(lat)||!isFinite(lng)) return;
+  const bounds = new google.maps.LatLngBounds();
+  bounds.extend({lat:uPos.lat, lng:uPos.lng});
+  bounds.extend({lat, lng});
+  map.fitBounds(bounds, {top:80, right:60, bottom:80, left:60});
+}
+
 function selPOI(id){
   selId=id; renderOrbs(); renderPins([]);
   const p=places.find(x=>x.id===id);
   if(!p||!map) return;
   const lat = parseFloat(p.lat);
   const lng = parseFloat(p.lon ?? p.lng);
-  if(!isFinite(lat) || !isFinite(lng)) return;
-  map.panTo({lat, lng});
+  if(!isFinite(lat)||!isFinite(lng)) return;
+
+  // Salva POI selezionato — la mappa mostra utente + POI
+  _poiSelectedId = id;
+  _fitUserAndPOI(id);
+
+  // Dopo 8s senza interazione, torna a seguire l'utente
+  if(_poiReturnTimer) clearTimeout(_poiReturnTimer);
+  _poiReturnTimer = setTimeout(()=>{
+    _poiSelectedId = null;
+    if(uPos&&map) map.panTo({lat:uPos.lat, lng:uPos.lng});
+  }, 8000);
 }
 
 // ━━━━━━━ MODE ━━━━━━━
