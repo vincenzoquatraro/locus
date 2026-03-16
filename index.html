@@ -663,19 +663,36 @@ html,body{height:100%;height:100dvh;overflow:hidden;background:var(--off);
   padding:6px 9px;border-radius:10px;border:1px solid var(--border);
   background:var(--off);transition:all .15s;
 }
-.tl-q:active{background:var(--border)}
+.tl-q:active,.tl-q.selected{background:var(--ink);color:white;border-color:var(--ink)}
+.tl-q.selected .tl-q-ico{opacity:1}
 .tl-q-ico{font-size:11px;flex-shrink:0;margin-top:1px;opacity:.6}
-.tl-q-row{
-  display:flex;align-items:center;justify-content:space-between;
-  gap:8px;margin-top:10px;
+
+/* ── BARRA INPUT + CHIEDI DI PIÙ ── */
+.tl-ask-row{
+  display:flex;align-items:center;gap:6px;
+  margin-top:10px;
+  padding:6px 8px;
+  border:1px solid var(--border);
+  border-radius:12px;
+  background:var(--off);
+  transition:border-color .15s;
 }
+.tl-ask-row:focus-within{
+  border-color:var(--blue);background:white;
+}
+.tl-ask-input{
+  flex:1;border:none;background:transparent;
+  font-family:'DM Sans',sans-serif;font-size:12px;
+  color:var(--ink);outline:none;min-width:0;
+}
+.tl-ask-input::placeholder{color:var(--ink3)}
 .tl-ask-more{
   flex-shrink:0;display:flex;align-items:center;gap:4px;
   padding:5px 11px;border-radius:20px;
   background:var(--ink);color:white;
   font-size:10px;font-weight:600;border:none;cursor:pointer;
   font-family:'DM Sans',sans-serif;letter-spacing:.01em;
-  transition:opacity .15s;
+  transition:opacity .15s;white-space:nowrap;
 }
 .tl-ask-more:active{opacity:.7}
 .tl-ask-more.loading{background:var(--ink3);pointer-events:none}
@@ -691,6 +708,41 @@ html,body{height:100%;height:100dvh;overflow:hidden;background:var(--off);
 .tl-expand-btn:active{background:var(--border)}
 .wiki-badge{display:inline-block;margin-right:5px;font-size:10px;color:#636366}
 .ollama-badge{display:flex;align-items:center;gap:2px;flex-wrap:wrap;margin-top:6px}
+
+/* ── TIMELINE CARD LAYOUT ── */
+.tl-b{flex:1;padding-bottom:12px;display:flex;flex-direction:column;gap:4px}
+
+/* Immagine float destra — il testo la avvolge */
+.tl-img-figure{
+  float:right;
+  width:33%;
+  margin:0 0 6px 10px;
+  padding:0;
+}
+.tl-wiki-img{
+  width:100%;
+  max-height:130px;
+  height:auto;
+  border-radius:8px;
+  object-fit:cover;
+  object-position:center top;
+  display:block;
+}
+.tl-img-caption{
+  font-size:9px;
+  color:var(--ink3);
+  line-height:1.4;
+  margin-top:4px;
+  text-align:center;
+  font-style:italic;
+}
+.tl-content-row{
+  overflow:hidden; /* clearfix */
+}
+.tl-content-row::after{
+  content:'';display:table;clear:both;
+}
+.tl-b-has-img{ display:flex;flex-direction:column;gap:4px; }
 
 .tl-empty{
   display:flex;flex-direction:column;align-items:center;
@@ -1685,17 +1737,32 @@ function renderTLEntries(){
                    data-id="${eid}"
                    data-text="${encodeURIComponent(e.text)}">
                    Leggi tutto ↓
-           </button>
-           <div id="after-${eid}"></div>`
+           </button>`
         : `<div class="tl-txt">${e.text}</div>`;
     } else {
       bodyHtml='';
     }
     const wikiBadge = e.wikiUsed ? `<span class="wiki-badge">📖 Wikipedia</span>` : '';
     const badge = e.isOllama && !e.loading
-  ? `<div class="ollama-badge">${wikiBadge}🤖 llama3.2</div>`
-  : '';
+      ? `<div class="ollama-badge">${wikiBadge}🤖 llama3.2</div>`
+      : '';
+    const hasImg = !!(e.imageUrl && !e.loading);
     const eid2 = e.id || ('e'+i);
+
+    // Riga 3: immagine float destra, testo la avvolge
+    const captionHtml = (hasImg && e.imageCaption)
+      ? `<div class="tl-img-caption">${e.imageCaption}</div>`
+      : '';
+    const contentRow = hasImg
+      ? `<div class="tl-content-row">
+           <figure class="tl-img-figure">
+             <img class="tl-wiki-img" src="${e.imageUrl}" alt="" loading="lazy"/>
+             ${captionHtml}
+           </figure>
+           ${bodyHtml}
+         </div>`
+      : `<div class="tl-content-row">${bodyHtml}</div>`;
+
     return`<div class="tl-e" style="animation-delay:${delay}s">
       <div class="tl-l">
         <div class="tl-ic${e.type==='cur'?' cur':e.type==='fut'?' fut':''}">
@@ -1704,9 +1771,10 @@ function renderTLEntries(){
         ${!last?`<div class="tl-ln${e.type==='fut'?' dash':''}"></div>`:''}
       </div>
       <div class="tl-b">
-        <div class="tl-t">${e.time||nt()}</div>
+        <div class="tl-t">${currentCity} · ${e.time||nt()}</div>
         <div class="tl-title" id="tl-title-${eid2}">${e.title}</div>
-        ${bodyHtml}
+        ${contentRow}
+        <div id="after-${eid2}"></div>
         ${e.dist&&!e.loading?`<div class="tl-dist">${e.dir} · ${fmt(e.dist)}</div>`:''}
         ${badge}
       </div></div>`;
@@ -1731,7 +1799,6 @@ function expandTL(eid, encodedText){
   txtEl.classList.remove('tl-preview');
   btnEl.style.display = 'none';
 
-  // Aggiunge domande e "chiedi di più" dopo il testo
   const after = document.getElementById('after-'+eid);
   if(!after || document.getElementById('q-'+eid)) return;
   const questions = generateQuestions(fullText);
@@ -1742,26 +1809,30 @@ function expandTL(eid, encodedText){
           <span class="tl-q-ico">💬</span><span>${q}</span>
         </div>`).join('')}
     </div>
-    <div class="tl-q-row">
-      <span style="font-size:10px;color:var(--ink3)">Vuoi saperne di più?</span>
+    <div class="tl-ask-row">
+      <input class="tl-ask-input" id="ask-input-${eid}"
+        placeholder="Scrivi una domanda…"
+        onkeydown="if(event.key==='Enter') sendCustomAsk('${eid}')"/>
       <button class="tl-ask-more" id="askmore-${eid}" data-eid="${eid}">✦ Chiedi di più</button>
     </div>`;
 }
 
 function generateQuestions(text){
-  // Extract key nouns/topics from text to form questions
   const qs = [];
-  if(/\d{3,4}/.test(text)) qs.push('Cosa succedeva qui in quell\'epoca?');
-  if(/chiesa|basilica|duomo|cattedrale/i.test(text)) qs.push('Quando è stata costruita?');
-  if(/palazzo|villa|edificio|architettura/i.test(text)) qs.push('Chi ci abitava?');
-  if(/mercato|commercio|bottega|negozi/i.test(text)) qs.push('Come si viveva qui un tempo?');
-  if(/guerra|battaglia|conflitto|assedio/i.test(text)) qs.push('Quali eventi storici sono accaduti qui?');
+  if(/\d{3,4}/.test(text))                              qs.push('Cosa succedeva qui in quell\'epoca?');
+  if(/chiesa|basilica|duomo|cattedrale/i.test(text))     qs.push('Quando è stata costruita?');
+  if(/palazzo|villa|edificio|architettura/i.test(text))  qs.push('Chi ci abitava?');
+  if(/mercato|commercio|bottega|negozi/i.test(text))     qs.push('Come si viveva qui un tempo?');
+  if(/guerra|battaglia|conflitto|assedio/i.test(text))   qs.push('Quali eventi storici sono accaduti qui?');
   if(/artista|pittore|scultore|poeta|scrittore/i.test(text)) qs.push('Quali altre opere ha lasciato?');
-  if(/fontana|monumento|statua/i.test(text)) qs.push('Chi ha realizzato quest\'opera?');
-  // Always add fallback questions
-  if(qs.length < 2) qs.push('Cosa rende questo posto unico?');
-  if(qs.length < 2) qs.push('Cosa posso visitare nelle vicinanze?');
-  return qs.slice(0,3);
+  if(/fontana|monumento|statua/i.test(text))             qs.push('Chi ha realizzato quest\'opera?');
+  if(/cardinale|vescovo|papa|santo|beato/i.test(text))   qs.push('Qual è il suo lascito spirituale?');
+  if(/nato|nacque|morì|morto|vissuto/i.test(text))       qs.push('Dove è sepolto?');
+  // Fallback fino a 4 domande
+  const fallback = ['Cosa rende questo posto unico?','Cosa posso visitare nelle vicinanze?',
+                    'Ci sono leggende su questo luogo?','Come è cambiato nel tempo?'];
+  for(const f of fallback){ if(qs.length>=4) break; if(!qs.includes(f)) qs.push(f); }
+  return qs.slice(0,4);
 }
 
 /* CLICK HANDLER per domande e "chiedi di più" */
@@ -1771,15 +1842,32 @@ document.addEventListener('click', function(e){
     const eid = qEl.dataset.eid;
     const q = decodeURIComponent(qEl.dataset.q);
     const street = document.getElementById('tl-title-'+eid)?.textContent || lastStreetName;
+    // Evidenzia domanda selezionata
+    qEl.closest('.tl-questions')?.querySelectorAll('.tl-q').forEach(el=>el.classList.remove('selected'));
+    qEl.classList.add('selected');
     fetchDeepDive(eid, q, street);
     return;
   }
   const moreEl = e.target.closest('.tl-ask-more');
   if(moreEl){
     const eid = moreEl.dataset.eid;
-    askMore(eid, moreEl);
+    sendCustomAsk(eid);
   }
 });
+
+function sendCustomAsk(eid){
+  const input = document.getElementById('ask-input-'+eid);
+  const btn = document.getElementById('askmore-'+eid);
+  const q = input?.value?.trim();
+  const street = document.getElementById('tl-title-'+eid)?.textContent || lastStreetName;
+  if(!q){
+    // Senza testo: approfondimento generico
+    askMore(eid, btn);
+    return;
+  }
+  input.value = '';
+  fetchDeepDive(eid, q, street, null, btn);
+}
 
 async function askMore(eid, encodedText){
   const btn = document.getElementById('askmore-'+eid);
@@ -2173,7 +2261,7 @@ async function triggerOllamaForStreet(streetName, quarter=''){
   pushTL({id:loadingId,type:'cur',emoji:'<svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24"><path fill="currentColor" d="m20.713 7.128l-.246.566a.506.506 0 0 1-.934 0l-.246-.566a4.36 4.36 0 0 0-2.22-2.25l-.759-.339a.53.53 0 0 1 0-.963l.717-.319A4.37 4.37 0 0 0 19.276.931L19.53.32a.506.506 0 0 1 .942 0l.253.61a4.37 4.37 0 0 0 2.25 2.327l.718.32a.53.53 0 0 1 0 .962l-.76.338a4.36 4.36 0 0 0-2.219 2.251M8.5 6h-2v12h2zM4 10H2v4h2zm9-8h-2v20h2zm4.5 6h-2v10h2zm4.5 2h-2v4h2z"/></svg>',title:streetName,text:null,loading:true,isOllama:true});
   const result=await callN8NAgent(streetName);
   if(result){
-    tlEntries=tlEntries.map(e=>e.id===loadingId?{...e,text:result.text,loading:false,wikiUsed:result.wikiUsed}:e);
+    tlEntries=tlEntries.map(e=>e.id===loadingId?{...e,text:result.text,loading:false,wikiUsed:result.wikiUsed,imageUrl:result.imageUrl||'',imageCaption:result.imageCaption||''}:e);
     renderTLEntries();
   } else {
     tlEntries=tlEntries.map(e=>e.id===loadingId?{...e,text:'⚠️ Agente non raggiungibile — controlla n8n e ngrok',loading:false}:e);
