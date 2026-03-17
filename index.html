@@ -9,7 +9,8 @@
 <meta name="theme-color" content="#ffffff">
 <title>Locus</title>
 <link href="https://fonts.googleapis.com/css2?family=DM+Sans:opsz,wght@9..40,300;9..40,400;9..40,500;9..40,600&family=DM+Serif+Display:ital@0;1&display=swap" rel="stylesheet">
-<script src="https://maps.googleapis.com/maps/api/js?key=AIzaSyCDjB2rHzgLzwYGw8V5eboxfXKeYC6GTmY&libraries=places,geometry"></script>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <style>
 *{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent;user-select:none}
 :root{
@@ -247,9 +248,8 @@ html,body{height:100%;height:100dvh;overflow:hidden;background:var(--off);
   border:none;
 }
 #map{width:100%;height:100%;}
-/* Google Maps — rimuovi branding */
-.gm-style-cc, .gm-bundled-control-on-bottom { display:none !important }
-.gmnoprint a, .gmnoprint span, .gm-style-cc { display:none }
+.leaflet-control-attribution{display:none!important}
+.leaflet-control-zoom{display:none!important}
 
 /* ── ZOOM CONTROLS custom ── */
 #custom-zoom{
@@ -337,11 +337,63 @@ html,body{height:100%;height:100dvh;overflow:hidden;background:var(--off);
 #tl-section.map-mode #ollama-dbg{
   display:none !important;
 }
+
+/* ── STREET BANNER in MAP MODE — carta grande con sfondo ── */
 #tl-section.map-mode #street-banner{
-  margin:10px 14px;
-  border-radius:14px;
-  box-shadow:0 2px 12px rgba(0,0,0,.08);
+  margin:12px 14px;
+  padding:18px 16px;
+  border-radius:18px;
+  border:none;
+  background:linear-gradient(135deg, #1d1d1f 0%, #3a3a3c 100%);
+  box-shadow:0 8px 32px rgba(0,0,0,.22);
+  gap:12px;
+  transition:all .35s cubic-bezier(.4,0,.2,1);
 }
+#tl-section.map-mode #street-banner .sb-icon{
+  width:36px;height:36px;
+  background:rgba(255,255,255,.12);
+  border-radius:50%;
+  font-size:18px;
+}
+#tl-section.map-mode #street-banner .sb-icon svg{
+  filter:invert(1);
+}
+#tl-section.map-mode #street-banner .sb-label{
+  color:rgba(255,255,255,.5);
+  font-size:10px;letter-spacing:.08em;
+}
+#tl-section.map-mode #street-banner .sb-street{
+  color:white;
+  font-size:20px;
+  font-family:'DM Serif Display',serif;
+  letter-spacing:-.02em;
+  white-space:normal;
+  line-height:1.2;
+}
+#tl-section.map-mode #street-banner .sb-acc{
+  color:rgba(255,255,255,.5);
+  font-size:11px;
+}
+#tl-section.map-mode #street-banner #next-card-toggle{
+  background:rgba(255,255,255,.12);
+  border-color:rgba(255,255,255,.2);
+  color:white;
+}
+
+/* Street banner normale — transizione */
+#street-banner{
+  display:none;
+  flex-direction:row;
+  align-items:center;
+  gap:8px;
+  margin:10px 14px 0;
+  padding:9px 13px;
+  background:var(--white);
+  border:1px solid var(--border);
+  border-radius:12px;
+  transition:all .35s cubic-bezier(.4,0,.2,1);
+}
+#street-banner.vis{display:flex}
 
 /* timeline entry — animated in */
 .tl-e{
@@ -377,18 +429,6 @@ html,body{height:100%;height:100dvh;overflow:hidden;background:var(--off);
   color:var(--ink2);background:var(--off);padding:3px 8px;border-radius:20px;margin-top:4px}
 
 /* ── CURRENT STREET BANNER ── */
-#street-banner{
-  display:none;
-  flex-direction:row;
-  align-items:center;
-  gap:8px;
-  margin:10px 14px 0;
-  padding:9px 13px;
-  background:var(--white);
-  border:1px solid var(--border);
-  border-radius:12px;
-}
-#street-banner.vis{display:flex}
 .sb-icon{
   width:28px;height:28px;border-radius:50%;
   background:var(--off);
@@ -1105,7 +1145,7 @@ const SIM_MESSAGES = [
 ];
 
 // ━━━━━━━ STATE ━━━━━━━
-let map, uMarker, rPolyline, dMarker, pMarkers={};
+// let map, uMark, rLayer, dMark, pLayers={};
 let uPos=null, places=[], selId=null;
 let mode='explore', filters=new Set(['all']);
 let heading=0;
@@ -1127,75 +1167,62 @@ let ollamaLoading = false;
 let currentCountry = '';
 let currentCity = '';
 
-// ━━━━━━━ MAP — Google Maps ━━━━━━━
-function initMap(lat,lng){
-  if(map){ map.panTo({lat,lng}); return; }
-  map = new google.maps.Map(document.getElementById('map'),{
-    center:{lat,lng}, zoom:16,
-    disableDefaultUI: true,
-    styles:[
-      {featureType:'poi',stylers:[{visibility:'off'}]},
-      {featureType:'transit',stylers:[{visibility:'off'}]},
-      {elementType:'labels.icon',stylers:[{visibility:'off'}]},
-      {featureType:'road',elementType:'geometry',stylers:[{color:'#ffffff'}]},
-      {featureType:'road',elementType:'labels.text.fill',stylers:[{color:'#9e9e9e'}]},
-      {featureType:'landscape',stylers:[{color:'#f5f5f5'}]},
-      {featureType:'water',stylers:[{color:'#c9d6e3'}]},
-      {featureType:'administrative',elementType:'labels.text.fill',stylers:[{color:'#6e6e73'}]}
-    ]
-  });
-  map.addListener('click', e => onMapClick(e));
-  map.addListener('idle', ()=>{ updateCone(); renderOrbs(); });
-  map.addListener('center_changed', ()=>{ updateCone(); });
+// ── auto-follow: true = mappa segue utente, false = utente ha spostato la mappa
+let _followUser = true;
+let _poiSelectedId = null;
+let _poiReturnTimer = null;
+let _followReturnTimer = null;
 
-  // Quando l'utente trascina la mappa, smetti di seguirlo
-  map.addListener('dragstart', ()=>{
+function _setFollow(val){
+  _followUser = val;
+  const btn = document.getElementById('btn-center');
+  if(btn){
+    btn.style.background = val ? 'var(--white)' : 'var(--blue)';
+    btn.style.color      = val ? ''             : 'white';
+    btn.title = val ? 'Centrati' : 'Torna alla tua posizione';
+  }
+}
+
+// ━━━━━━━ MAP — Leaflet + OpenStreetMap ━━━━━━━
+let map, uMark, rLayer, dMark, pLayers={};
+
+function initMap(lat,lng){
+  if(map){ map.setView([lat,lng],16); return; }
+  map = L.map('map',{zoomControl:false,attributionControl:false}).setView([lat,lng],16);
+  L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png',{maxZoom:19}).addTo(map);
+  map.on('click', e=>onMapClick(e));
+  map.on('move zoom', ()=>{ updateCone(); renderOrbs(); });
+  map.on('dragstart', ()=>{
     _setFollow(false);
     if(_followReturnTimer){ clearTimeout(_followReturnTimer); _followReturnTimer=null; }
   });
 
-  // Zoom controls custom — piccoli e moderni
+  // Zoom controls custom
   const zoomDiv = document.createElement('div');
-  zoomDiv.innerHTML = `
-    <div id="custom-zoom">
-      <button id="zoom-in"  onclick="map.setZoom(map.getZoom()+1)">+</button>
-      <button id="zoom-out" onclick="map.setZoom(map.getZoom()-1)">−</button>
-    </div>`;
-  map.controls[google.maps.ControlPosition.RIGHT_CENTER].push(zoomDiv.firstElementChild);
+  zoomDiv.innerHTML = `<div id="custom-zoom">
+    <button id="zoom-in"  onclick="map.setZoom(map.getZoom()+1)">+</button>
+    <button id="zoom-out" onclick="map.setZoom(map.getZoom()-1)">−</button>
+  </div>`;
+  document.getElementById('map-card').appendChild(zoomDiv.firstElementChild);
+  document.getElementById('custom-zoom').style.cssText='position:absolute;right:10px;top:50%;transform:translateY(-50%);z-index:999;display:flex;flex-direction:column;gap:4px';
 }
 
 function placeUser(lat,lng){
-  if(uMarker){ uMarker.setPosition({lat,lng}); return; }
-  uMarker = new google.maps.Marker({
-    position:{lat,lng}, map,
-    icon:{ path:google.maps.SymbolPath.CIRCLE, scale:0 },
-    zIndex:999
-  });
+  const ic=L.divIcon({className:'',html:'<div style="display:none"></div>',iconSize:[0,0]});
+  if(uMark){ uMark.setLatLng([lat,lng]); return; }
+  uMark=L.marker([lat,lng],{icon:ic,zIndexOffset:999}).addTo(map);
 }
 
 function centerUser(){
-  _followUser = true;
-  _poiSelectedId = null;
+  _followUser=true; _poiSelectedId=null;
   if(_poiReturnTimer){ clearTimeout(_poiReturnTimer); _poiReturnTimer=null; }
-  if(uPos&&map) map.panTo({lat:uPos.lat,lng:uPos.lng});
+  if(uPos&&map) map.panTo([uPos.lat,uPos.lng]);
 }
 
-// ━━━━━━━ USER DOT + DIRECTION CONE (Google Maps style) ━━━━━━━
-function latLngToPixel(lat, lng){
+function latLngToPixel(lat,lng){
   if(!map) return {x:0,y:0};
-  const proj = map.getProjection();
-  if(!proj) return {x:0,y:0};
-  const bounds = map.getBounds();
-  if(!bounds) return {x:0,y:0};
-  const topRight = proj.fromLatLngToPoint(bounds.getNorthEast());
-  const bottomLeft = proj.fromLatLngToPoint(bounds.getSouthWest());
-  const scale = Math.pow(2, map.getZoom());
-  const worldPoint = proj.fromLatLngToPoint(new google.maps.LatLng(lat, lng));
-  const mapEl = document.getElementById('map');
-  return {
-    x: (worldPoint.x - bottomLeft.x) * scale,
-    y: (worldPoint.y - topRight.y) * scale
-  };
+  const pt=map.latLngToContainerPoint([lat,lng]);
+  return {x:pt.x, y:pt.y};
 }
 
 function updateCone(){
@@ -1256,22 +1283,6 @@ function requestGPS(){
     },
     {enableHighAccuracy:true, timeout:14000, maximumAge:0}
   );
-// ── auto-follow: true = mappa segue utente, false = utente ha spostato la mappa
-let _followUser = true;
-let _poiSelectedId = null;
-let _poiReturnTimer = null;
-let _followReturnTimer = null;
-
-function _setFollow(val){
-  _followUser = val;
-  const btn = document.getElementById('btn-center');
-  if(btn){
-    btn.style.background = val ? 'var(--white)' : 'var(--blue)';
-    btn.style.color      = val ? ''             : 'white';
-    btn.title = val ? 'Centrati' : 'Torna alla tua posizione';
-  }
-}
-
   navigator.geolocation.watchPosition(
     p=>{
       hideGpsIndicator();
@@ -1684,17 +1695,12 @@ function renderOrbs(){
   const sortedByDist=[...visible].sort((a,b)=>a.dist-b.dist);
 
   visible.forEach(p=>{
-    const screenPt = latLngToPixel(p.lat, p.lon);
-    const onScreen=screenPt.x>4&&screenPt.x<CW-4&&screenPt.y>4&&screenPt.y<CH-4;
-    if(onScreen)return;
-
     const bear=brng(uPos.lat,uPos.lng,p.lat,p.lon);
     const rel=((bear-heading)+360)%360;
     const norm=1-((p.dist-mn)/(mx-mn+1));
     const sz=Math.round(24+norm*22);
     const pad=sz/2+4;
 
-    // borderPt con padding inferiore extra in MAP mode
     const{x,y}=borderPtPadded(ZCX,ZCY,ZW,ZH,rel,pad,bottomPad);
 
     const orb=document.createElement('div');
@@ -1730,27 +1736,16 @@ function borderPt(cx,cy,W,H,deg,pad){
 
 // ━━━━━━━ MAP PINS ━━━━━━━
 function renderPins(onRoute){
-  Object.values(pMarkers).forEach(m=>m.setMap(null)); pMarkers={};
+  Object.values(pLayers).forEach(m=>map.removeLayer(m)); pLayers={};
   vp().forEach(p=>{
-    const lat = parseFloat(p.lat);
-    const lng = parseFloat(p.lon ?? p.lng);
+    const lat=parseFloat(p.lat), lng=parseFloat(p.lon??p.lng);
     if(!isFinite(lat)||!isFinite(lng)) return;
-    const marker = new google.maps.Marker({
-      position:{lat, lng}, map,
-      icon:{
-        url: `data:image/svg+xml;charset=UTF-8,${encodeURIComponent(`
-          <svg xmlns="http://www.w3.org/2000/svg" width="26" height="36">
-            <circle cx="13" cy="13" r="12" fill="white" stroke="${p.id===selId?'#1d1d1f':'rgba(0,0,0,0.1)'}" stroke-width="${p.id===selId?'2':'1'}"/>
-            <text x="13" y="18" text-anchor="middle" font-size="14">${p.emoji}</text>
-            <circle cx="13" cy="34" r="2" fill="rgba(0,0,0,0.2)"/>
-          </svg>`)}`,
-        scaledSize: new google.maps.Size(26,36),
-        anchor: new google.maps.Point(13,36)
-      },
-      zIndex: p.id===selId ? 999 : 1
-    });
-    marker.addListener('click',()=>{ selPOI(p.id); openPOIPopup(p); });
-    pMarkers[p.id]=marker;
+    const html=`<div class="mp2${p.id===selId?' sel':''}" id="pin-${p.id}">
+      <div class="mpb"><span>${p.emoji}</span></div><div class="mpd"></div></div>`;
+    const ic=L.divIcon({className:'',html,iconSize:[26,36],iconAnchor:[13,36]});
+    const m=L.marker([lat,lng],{icon:ic}).addTo(map);
+    m.on('click',()=>{ selPOI(p.id); openPOIPopup(p); });
+    pLayers[p.id]=m;
   });
 }
 
@@ -2002,8 +1997,9 @@ function toggleSettings(){
 }
 
 function centerMap(){
-  if(!map || !uPos) return;
-  map.panTo({lat:uPos.lat, lng:uPos.lng});
+  if(!map||!uPos) return;
+  map.invalidateSize({animate:false,pan:false});
+  map.setView([uPos.lat,uPos.lng],map.getZoom(),{animate:false});
 }
 
 // ── GRAB HANDLE — 3 snap points ──
@@ -2155,15 +2151,11 @@ function setupSwipe(){}
 // ━━━━━━━ SELECT ━━━━━━━
 function _fitUserAndPOI(id){
   if(!map||!uPos) return;
-  const p = places.find(x=>x.id===id);
+  const p=places.find(x=>x.id===id);
   if(!p) return;
-  const lat = parseFloat(p.lat);
-  const lng = parseFloat(p.lon ?? p.lng);
+  const lat=parseFloat(p.lat), lng=parseFloat(p.lon??p.lng);
   if(!isFinite(lat)||!isFinite(lng)) return;
-  const bounds = new google.maps.LatLngBounds();
-  bounds.extend({lat:uPos.lat, lng:uPos.lng});
-  bounds.extend({lat, lng});
-  map.fitBounds(bounds, {top:80, right:60, bottom:80, left:60});
+  map.fitBounds([[uPos.lat,uPos.lng],[lat,lng]],{padding:[60,60]});
 }
 
 function selPOI(id){
@@ -2222,7 +2214,7 @@ function clearSrch(){document.getElementById('si').value='';hideSug();}
 function onMapClick(e){
   closePOIPopup();
   if(mode!=='navigate') return;
-  startNav({name:'Punto sulla mappa', lat:e.latLng.lat(), lng:e.latLng.lng()});
+  startNav({name:'Punto sulla mappa', lat:e.latlng.lat, lng:e.latlng.lng});
 }
 
 // ━━━━━━━ NAVIGATION ━━━━━━━
@@ -2230,35 +2222,18 @@ async function startNav(dest){
   hideSug();clearSrch();
   document.getElementById('route-bar').style.display='block';
   document.getElementById('rb-dn').textContent=dest.name;
-  if(dMarker) dMarker.setMap(null);
-  dMarker = new google.maps.Marker({
-    position:{lat:dest.lat,lng:dest.lng}, map,
-    icon:{
-      url:`data:image/svg+xml;charset=UTF-8,${encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" width="24" height="32"><rect x="2" y="2" width="20" height="20" rx="4" fill="#1d1d1f"/><text x="12" y="17" text-anchor="middle" font-size="13">🏁</text><circle cx="12" cy="30" r="2" fill="rgba(0,0,0,0.3)"/></svg>')}`,
-      scaledSize: new google.maps.Size(24,32),
-      anchor: new google.maps.Point(12,32)
-    }, zIndex:500
-  });
-  // Google Maps Directions API — percorso pedonale reale
-  let coords;
-  try {
-    coords = await fetchGoogleRoute(uPos.lat, uPos.lng, dest.lat, dest.lng);
-  } catch(e) {
-    coords = null;
-  }
-  if(!coords || coords.length < 2) {
-    coords = simRoute(uPos.lat, uPos.lng, dest.lat, dest.lng);
-  }
+  if(dMark) map.removeLayer(dMark);
+  const di2=L.divIcon({className:'',html:'<div class="dest-pin"><div class="dest-flag">🏁</div><div class="dest-d"></div></div>',iconSize:[24,32],iconAnchor:[12,32]});
+  dMark=L.marker([dest.lat,dest.lng],{icon:di2,zIndexOffset:500}).addTo(map);
 
-  if(rPolyline) rPolyline.setMap(null);
-  rPolyline = new google.maps.Polyline({
-    path: coords.map(c=>({lat:c[0],lng:c[1]})),
-    strokeColor:'#007AFF', strokeOpacity:.8, strokeWeight:5,
-    map
-  });
-  const bounds = new google.maps.LatLngBounds();
-  coords.forEach(c=>bounds.extend({lat:c[0],lng:c[1]}));
-  map.fitBounds(bounds, {top:80,right:40,bottom:80,left:40});
+  // Percorso via OSRM (gratuito, pedonale)
+  let coords;
+  try{ coords=await fetchOSRMRoute(uPos.lat,uPos.lng,dest.lat,dest.lng); }catch(e){ coords=null; }
+  if(!coords||coords.length<2) coords=simRoute(uPos.lat,uPos.lng,dest.lat,dest.lng);
+
+  if(rLayer) map.removeLayer(rLayer);
+  rLayer=L.polyline(coords,{color:'#007AFF',weight:5,opacity:.8,lineCap:'round',lineJoin:'round'}).addTo(map);
+  map.fitBounds(rLayer.getBounds(),{padding:[60,60]});
   const along=findAlong(coords);
   const td=rLen(coords), tm=Math.round(td/80);
   document.getElementById('rb-dist').textContent=fmt(td);
@@ -2274,22 +2249,14 @@ function buildTLnav(along){
     title:p.name,text:p.text,dist:p._rd,dir:'→'}));
   renderTLEntries();
 }
-// Google Maps Directions API — percorso pedonale reale
-async function fetchGoogleRoute(fromLat, fromLng, toLat, toLng){
-  return new Promise((resolve, reject)=>{
-    const service = new google.maps.DirectionsService();
-    service.route({
-      origin: {lat: fromLat, lng: fromLng},
-      destination: {lat: toLat, lng: toLng},
-      travelMode: google.maps.TravelMode.WALKING
-    }, (result, status)=>{
-      if(status !== 'OK'){ reject(new Error(status)); return; }
-      // Decodifica i punti dell'itinerario
-      const path = result.routes[0].overview_path;
-      const coords = path.map(p=>[p.lat(), p.lng()]);
-      resolve(coords);
-    });
-  });
+// OSRM — routing pedonale gratuito, nessuna API key
+async function fetchOSRMRoute(fromLat,fromLng,toLat,toLng){
+  const url=`https://router.project-osrm.org/route/v1/foot/${fromLng},${fromLat};${toLng},${toLat}?overview=full&geometries=geojson`;
+  const r=await fetch(url,{signal:AbortSignal.timeout(8000)});
+  if(!r.ok) throw new Error('OSRM '+r.status);
+  const d=await r.json();
+  if(!d.routes?.length) throw new Error('No route');
+  return d.routes[0].geometry.coordinates.map(c=>[c[1],c[0]]);
 }
 function simRoute(la,lo,la2,lo2){
   const n=30,c=[];
@@ -2320,8 +2287,8 @@ function updateNav(){
 }
 function cancelRoute(silent){
   if(simNavI)clearInterval(simNavI);rData=null;simNavP=0;
-  if(rPolyline){rPolyline.setMap(null);rPolyline=null;}
-  if(dMarker){dMarker.setMap(null);dMarker=null;}
+  if(rLayer){map.removeLayer(rLayer);rLayer=null;}
+  if(dMark){map.removeLayer(dMark);dMark=null;}
   document.getElementById('rb-fill').style.width='0%';
   document.getElementById('route-bar').style.display='none';
   buildTL();if(!silent)setMode('explore');
