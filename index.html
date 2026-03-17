@@ -11,6 +11,7 @@
 <link href="https://fonts.googleapis.com/css2?family=DM+Sans:opsz,wght@9..40,300;9..40,400;9..40,500;9..40,600&family=DM+Serif+Display:ital@0;1&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
 <style>
 *{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent;user-select:none}
 :root{
@@ -500,7 +501,52 @@ html,body{height:100%;height:100dvh;overflow:hidden;background:var(--off);
 .bc-dst{font-size:10px;color:var(--blue);font-weight:500}
 .bif-skip{text-align:center;margin-top:10px;font-size:12px;color:var(--ink3);cursor:pointer}
 
-/* ── GPS indicator (small, non-invasive) ── */
+/* ━━━━━━━ AUTH SCREEN ━━━━━━━ */
+#auth-screen{
+  position:fixed;inset:0;z-index:99999;
+  background:var(--white);
+  display:flex;flex-direction:column;align-items:center;justify-content:center;
+  padding:40px 32px;gap:0;
+  transition:opacity .4s, transform .4s;
+}
+#auth-screen.hiding{opacity:0;transform:translateY(-20px);pointer-events:none}
+#auth-screen.hidden{display:none}
+.auth-logo{font-family:"DM Serif Display",serif;font-size:48px;letter-spacing:-.04em;color:var(--ink);margin-bottom:6px}
+.auth-logo-dot{display:inline-block;width:10px;height:10px;border-radius:50%;background:var(--blue);margin-left:2px;margin-bottom:6px}
+.auth-tagline{font-size:14px;color:var(--ink3);font-weight:300;margin-bottom:48px;text-align:center;line-height:1.5}
+.auth-form{width:100%;max-width:320px;display:flex;flex-direction:column;gap:12px}
+.auth-label{font-size:11px;font-weight:600;color:var(--ink3);letter-spacing:.04em;text-transform:uppercase;margin-bottom:-4px}
+.auth-input{width:100%;padding:14px 16px;border-radius:12px;border:1.5px solid var(--border);background:var(--off);font-family:"DM Sans",sans-serif;font-size:15px;color:var(--ink);outline:none;transition:border-color .15s}
+.auth-input:focus{border-color:var(--blue);background:white}
+.auth-btn{width:100%;padding:15px;border-radius:12px;background:var(--ink);color:white;border:none;font-family:"DM Sans",sans-serif;font-size:15px;font-weight:500;cursor:pointer;transition:opacity .15s;margin-top:4px}
+.auth-btn:active{opacity:.8}
+.auth-btn:disabled{opacity:.5;pointer-events:none}
+.auth-msg{font-size:13px;text-align:center;line-height:1.6;padding:12px 16px;border-radius:10px;background:rgba(0,122,255,.07);color:var(--blue);display:none}
+.auth-msg.visible{display:block}
+.auth-msg.error{background:rgba(255,59,48,.07);color:#ff3b30}
+.auth-footer{margin-top:32px;font-size:12px;color:var(--ink3);text-align:center;line-height:1.6}
+#user-btn{width:30px;height:30px;border-radius:50%;border:1.5px solid var(--border);background:var(--off);display:flex;align-items:center;justify-content:center;font-size:14px;cursor:pointer;flex-shrink:0;transition:all .15s}
+#user-btn.logged-in{background:var(--ink);color:white;border-color:var(--ink)}
+.tl-flip-btn{position:absolute;top:8px;right:8px;width:22px;height:22px;border-radius:50%;border:1px solid var(--border);background:var(--off);display:flex;align-items:center;justify-content:center;font-size:11px;cursor:pointer;color:var(--ink3);transition:all .15s;z-index:2}
+.tl-flip-btn:active{background:var(--ink);color:white;border-color:var(--ink)}
+.tl-e-wrap{position:relative}
+.contrib-panel{display:none;background:var(--off);border-radius:10px;padding:10px 12px;margin-top:6px;flex-direction:column;gap:8px}
+.contrib-panel.vis{display:flex}
+.contrib-title{font-size:10px;font-weight:600;color:var(--ink3);letter-spacing:.05em;text-transform:uppercase}
+.contrib-tabs{display:flex;gap:6px}
+.contrib-tab{flex:1;padding:5px 0;border-radius:8px;border:1px solid var(--border);background:white;font-size:11px;font-weight:500;color:var(--ink2);cursor:pointer;text-align:center;transition:all .15s}
+.contrib-tab.on{background:var(--ink);color:white;border-color:var(--ink)}
+.contrib-textarea{width:100%;padding:8px 10px;border-radius:8px;border:1px solid var(--border);background:white;font-family:"DM Sans",sans-serif;font-size:12px;color:var(--ink);resize:none;height:70px;outline:none;transition:border-color .15s}
+.contrib-textarea:focus{border-color:var(--blue)}
+.contrib-actions{display:flex;align-items:center;justify-content:space-between;gap:8px}
+.contrib-send{padding:6px 14px;border-radius:20px;background:var(--ink);color:white;border:none;font-size:11px;font-weight:600;cursor:pointer;font-family:"DM Sans",sans-serif;transition:opacity .15s}
+.contrib-send:active{opacity:.7}
+.contrib-cancel{font-size:11px;color:var(--ink3);cursor:pointer;padding:6px}
+.contrib-stars{display:flex;gap:4px;font-size:20px}
+.contrib-star{cursor:pointer;opacity:.3;transition:opacity .15s}
+.contrib-star.on{opacity:1}
+
+/* ── GPS INDICATOR ── */
 #gps-indicator{
   position:fixed;bottom:calc(var(--safe-bot)+16px);left:50%;transform:translateX(-50%);
   z-index:999;
@@ -826,6 +872,21 @@ html,body{height:100%;height:100dvh;overflow:hidden;background:var(--off);
 </style>
 </head>
 <body>
+
+<!-- ━━━━━━━ AUTH SCREEN ━━━━━━━ -->
+<div id="auth-screen">
+  <div class="auth-logo">locus<span class="auth-logo-dot"></span></div>
+  <div class="auth-tagline">La tua guida locale AI.<br>Inserisci la tua email per accedere.</div>
+  <div class="auth-form">
+    <div class="auth-label">Email</div>
+    <input class="auth-input" id="auth-email" type="email" placeholder="nome@email.com" autocomplete="email"/>
+    <button class="auth-btn" id="auth-btn" onclick="authSendLink()">Invia link di accesso</button>
+    <div class="auth-msg" id="auth-msg"></div>
+  </div>
+  <div class="auth-footer">
+    Ti invieremo un link magico via email.<br>Nessuna password necessaria.
+  </div>
+</div>
 <div id="app">
 
   <!-- TOPBAR -->
@@ -843,6 +904,7 @@ html,body{height:100%;height:100dvh;overflow:hidden;background:var(--off);
     </button>
   </div>
       <button id="settings-btn" onclick="toggleSettings()" title="Impostazioni"><svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24"><g fill="none" fill-rule="evenodd"><path d="m12.593 23.258l-.011.002l-.071.035l-.02.004l-.014-.004l-.071-.035q-.016-.005-.024.005l-.004.01l-.017.428l.005.02l.01.013l.104.074l.015.004l.012-.004l.104-.074l.012-.016l.004-.017l-.017-.427q-.004-.016-.017-.018m.265-.113l-.013.002l-.185.093l-.01.01l-.003.011l.018.43l.005.012l.008.007l.201.093q.019.005.029-.008l.004-.014l-.034-.614q-.005-.018-.02-.022m-.715.002a.02.02 0 0 0-.027.006l-.006.014l-.034.614q.001.018.017.024l.015-.002l.201-.093l.01-.008l.004-.011l.017-.43l-.003-.012l-.01-.01z"/><path fill="currentColor" d="M18 4a1 1 0 1 0-2 0v1H4a1 1 0 0 0 0 2h12v1a1 1 0 1 0 2 0V7h2a1 1 0 1 0 0-2h-2zM4 11a1 1 0 1 0 0 2h2v1a1 1 0 1 0 2 0v-1h12a1 1 0 1 0 0-2H8v-1a1 1 0 0 0-2 0v1zm-1 7a1 1 0 0 1 1-1h12v-1a1 1 0 1 1 2 0v1h2a1 1 0 1 1 0 2h-2v1a1 1 0 1 1-2 0v-1H4a1 1 0 0 1-1-1"/></g></svg> </button>
+      <button id="user-btn" onclick="toggleUserMenu()" title="Account">👤</button>
     </div>
 
     <div id="nav-search">
@@ -1835,7 +1897,32 @@ function renderTLEntries(){
          </div>`
       : `<div class="tl-content-row">${bodyHtml}</div>`;
 
-    return`<div class="tl-e" style="animation-delay:${delay}s">
+    const streetId = e.streetId || '';
+    const flipBtn = e.isOllama && !e.loading
+      ? `<button class="tl-flip-btn" data-eid="${eid2}" title="Contribuisci">✏️</button>` : '';
+    const contribPanel = e.isOllama && !e.loading ? `
+      <div class="contrib-panel" id="contrib-${eid2}" data-street-id="${streetId}">
+        <div class="contrib-title">Il tuo contributo</div>
+        <div class="contrib-tabs">
+          <div class="contrib-tab on" data-tab="note">📝 Nota</div>
+          <div class="contrib-tab" data-tab="correction">✏️ Correzione</div>
+          <div class="contrib-tab" data-tab="rating">⭐ Voto</div>
+        </div>
+        <textarea class="contrib-textarea" id="contrib-note-${eid2}" placeholder="Aggiungi una nota o una correzione…"></textarea>
+        <div class="contrib-stars" id="contrib-rating-${eid2}" data-score="0" style="display:none">
+          <span class="contrib-star" data-i="1">★</span>
+          <span class="contrib-star" data-i="2">★</span>
+          <span class="contrib-star" data-i="3">★</span>
+          <span class="contrib-star" data-i="4">★</span>
+          <span class="contrib-star" data-i="5">★</span>
+        </div>
+        <div class="contrib-actions">
+          <span class="contrib-cancel" data-eid="${eid2}">Annulla</span>
+          <button class="contrib-send" data-eid="${eid2}" data-title="${e.title}">Invia</button>
+        </div>
+      </div>` : '';
+
+    return`<div class="tl-e-wrap"><div class="tl-e" style="animation-delay:${delay}s">
       <div class="tl-l">
         <div class="tl-ic${e.type==='cur'?' cur':e.type==='fut'?' fut':''}">
           <span>${e.emoji}</span>
@@ -1843,13 +1930,16 @@ function renderTLEntries(){
         ${!last?`<div class="tl-ln${e.type==='fut'?' dash':''}"></div>`:''}
       </div>
       <div class="tl-b">
+        ${flipBtn}
         <div class="tl-t">${e.time||nt()}</div>
         <div class="tl-title" id="tl-title-${eid2}">${e.title}</div>
         ${contentRow}
         <div id="after-${eid2}"></div>
         ${e.dist&&!e.loading?`<div class="tl-dist">${e.dir} · ${fmt(e.dist)}</div>`:''}
         ${badge}
-      </div></div>`;
+      </div></div>
+      ${contribPanel}
+    </div>`;
   }).join('');
 }
 
@@ -1859,6 +1949,45 @@ document.addEventListener('click', function(e){
     const id = e.target.dataset.id;
     const text = e.target.dataset.text;
     expandTL(id, text);
+  }
+  // Flip button — apri/chiudi contributi
+  if(e.target.classList.contains('tl-flip-btn')){
+    const eid = e.target.dataset.eid;
+    toggleContrib(eid);
+  }
+  // Contrib tabs
+  if(e.target.classList.contains('contrib-tab')){
+    const panel = e.target.closest('.contrib-panel');
+    if(panel){
+      panel.querySelectorAll('.contrib-tab').forEach(t=>t.classList.remove('on'));
+      e.target.classList.add('on');
+      const tab = e.target.dataset.tab;
+      const eid = panel.id.replace('contrib-','');
+      const noteArea = document.getElementById(`contrib-note-${eid}`);
+      const ratingArea = document.getElementById(`contrib-rating-${eid}`);
+      if(noteArea) noteArea.style.display = (tab==='note'||tab==='correction') ? '' : 'none';
+      if(ratingArea) ratingArea.style.display = tab==='rating' ? '' : 'none';
+    }
+  }
+  // Rating stars
+  if(e.target.classList.contains('contrib-star')){
+    const stars = e.target.closest('.contrib-stars');
+    const i = parseInt(e.target.dataset.i);
+    stars.dataset.score = i;
+    stars.querySelectorAll('.contrib-star').forEach((s,idx)=>{
+      s.classList.toggle('on', idx < i);
+    });
+  }
+  // Cancel
+  if(e.target.classList.contains('contrib-cancel')){
+    const eid = e.target.dataset.eid;
+    document.getElementById('contrib-'+eid)?.classList.remove('vis');
+  }
+  // Send
+  if(e.target.classList.contains('contrib-send')){
+    const eid = e.target.dataset.eid;
+    const title = e.target.dataset.title;
+    submitContrib(eid, title);
   }
 });
 
@@ -2377,7 +2506,7 @@ async function triggerOllamaForStreet(streetName, quarter=''){
   pushTL({id:loadingId,type:'cur',emoji:'<svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24"><path fill="currentColor" d="m20.713 7.128l-.246.566a.506.506 0 0 1-.934 0l-.246-.566a4.36 4.36 0 0 0-2.22-2.25l-.759-.339a.53.53 0 0 1 0-.963l.717-.319A4.37 4.37 0 0 0 19.276.931L19.53.32a.506.506 0 0 1 .942 0l.253.61a4.37 4.37 0 0 0 2.25 2.327l.718.32a.53.53 0 0 1 0 .962l-.76.338a4.36 4.36 0 0 0-2.219 2.251M8.5 6h-2v12h2zM4 10H2v4h2zm9-8h-2v20h2zm4.5 6h-2v10h2zm4.5 2h-2v4h2z"/></svg>',title:streetName,text:null,loading:true,isOllama:true});
   const result=await callN8NAgent(streetName);
   if(result){
-    tlEntries=tlEntries.map(e=>e.id===loadingId?{...e,text:result.text,loading:false,wikiUsed:result.wikiUsed,imageUrl:result.imageUrl||'',imageCaption:result.imageCaption||''}:e);
+    tlEntries=tlEntries.map(e=>e.id===loadingId?{...e,text:result.text,loading:false,wikiUsed:result.wikiUsed,imageUrl:result.imageUrl||'',imageCaption:result.imageCaption||'',streetId:result.streetId||''}:e);
     renderTLEntries();
   } else {
     tlEntries=tlEntries.map(e=>e.id===loadingId?{...e,text:'⚠️ Agente non raggiungibile — controlla n8n e ngrok',loading:false}:e);
@@ -2411,8 +2540,154 @@ function am(t,m){const[h,mn]=t.split(':').map(Number),tot=h*60+mn+m;return`${Str
 
 window.addEventListener('resize',()=>{updateCone();renderOrbs();});
 window.addEventListener('load', ()=>{
-  requestGPS();
+  initSupabase();
 });
+
+// ━━━━━━━ SUPABASE AUTH ━━━━━━━
+const SUPA_URL = 'https://tnkibdwqoylzdpqsldsm.supabase.co';
+const SUPA_KEY = 'sb_publishable_9V8MJ4ugtkgIwpHqVbdecg_NGhBXO0u';
+let _supa, currentUser = null;
+
+function initSupabase(){
+  _supa = window.supabase.createClient(SUPA_URL, SUPA_KEY);
+
+  // Controlla sessione esistente (magic link ritorno)
+  _supa.auth.getSession().then(({data:{session}})=>{
+    if(session){
+      currentUser = session.user;
+      showApp();
+    } else {
+      // Ascolta cambio sessione (magic link click)
+      _supa.auth.onAuthStateChange((_event, session)=>{
+        if(session){ currentUser = session.user; showApp(); }
+      });
+      // Mostra auth screen
+    }
+  });
+}
+
+async function authSendLink(){
+  const email = document.getElementById('auth-email').value.trim();
+  const btn = document.getElementById('auth-btn');
+  const msg = document.getElementById('auth-msg');
+  if(!email){ showAuthMsg('Inserisci la tua email', true); return; }
+  btn.disabled = true; btn.textContent = 'Invio in corso…';
+  const {error} = await _supa.auth.signInWithOtp({
+    email,
+    options: { emailRedirectTo: window.location.href }
+  });
+  btn.disabled = false; btn.textContent = 'Invia link di accesso';
+  if(error){
+    showAuthMsg('Errore: ' + error.message, true);
+  } else {
+    showAuthMsg('✓ Link inviato! Controlla la tua email e clicca il link per accedere.', false);
+  }
+}
+
+function showAuthMsg(text, isError){
+  const msg = document.getElementById('auth-msg');
+  msg.textContent = text;
+  msg.className = 'auth-msg visible' + (isError?' error':'');
+}
+
+function showApp(){
+  const screen = document.getElementById('auth-screen');
+  screen.classList.add('hiding');
+  setTimeout(()=>{ screen.classList.add('hidden'); requestGPS(); }, 400);
+  // Aggiorna user button
+  const btn = document.getElementById('user-btn');
+  if(btn){ btn.classList.add('logged-in'); btn.title = currentUser?.email || 'Account'; }
+  updateUserBtn();
+}
+
+function updateUserBtn(){
+  const btn = document.getElementById('user-btn');
+  if(!btn) return;
+  if(currentUser){
+    btn.classList.add('logged-in');
+    btn.textContent = currentUser.email?.[0]?.toUpperCase() || '👤';
+  } else {
+    btn.classList.remove('logged-in');
+    btn.textContent = '👤';
+  }
+}
+
+function toggleUserMenu(){
+  if(!currentUser){
+    // Non loggato — mostra auth screen
+    const screen = document.getElementById('auth-screen');
+    screen.classList.remove('hidden','hiding');
+  } else {
+    // Loggato — mostra menu semplice
+    if(confirm(`Loggato come ${currentUser.email}\n\nVuoi uscire?`)){
+      _supa.auth.signOut().then(()=>{
+        currentUser = null;
+        updateUserBtn();
+      });
+    }
+  }
+}
+
+// ━━━━━━━ CONTRIBUTI UTENTE ━━━━━━━
+function toggleContrib(eid){
+  if(!currentUser){
+    showOllamaToast('Accedi per contribuire — tap su 👤');
+    return;
+  }
+  const panel = document.getElementById('contrib-'+eid);
+  if(panel) panel.classList.toggle('vis');
+}
+
+function setContribTab(eid, tab){
+  document.querySelectorAll(`#contrib-${eid} .contrib-tab`).forEach(t=>{
+    t.classList.toggle('on', t.dataset.tab===tab);
+  });
+  const noteArea = document.getElementById(`contrib-note-${eid}`);
+  const ratingArea = document.getElementById(`contrib-rating-${eid}`);
+  if(noteArea) noteArea.style.display = (tab==='note'||tab==='correction') ? '' : 'none';
+  if(ratingArea) ratingArea.style.display = tab==='rating' ? '' : 'none';
+}
+
+function setRatingStar(eid, score){
+  document.querySelectorAll(`#contrib-rating-${eid} .contrib-star`).forEach((s,i)=>{
+    s.classList.toggle('on', i < score);
+    s.dataset.score = i+1;
+  });
+  document.getElementById(`contrib-rating-${eid}`).dataset.score = score;
+}
+
+async function submitContrib(eid, streetTitle){
+  if(!currentUser){ showOllamaToast('Accedi prima'); return; }
+
+  const panel = document.getElementById('contrib-'+eid);
+  const activeTab = panel.querySelector('.contrib-tab.on')?.dataset.tab;
+  const streetId = panel.dataset.streetId;
+
+  if(activeTab==='rating'){
+    const score = parseInt(document.getElementById(`contrib-rating-${eid}`).dataset.score||0);
+    if(!score){ showOllamaToast('Seleziona un voto'); return; }
+    if(!streetId){ showOllamaToast('Via non ancora salvata nel DB'); return; }
+    await _supa.from('ratings').upsert({
+      street_id: streetId,
+      user_id: currentUser.id,
+      score
+    }, { onConflict: 'street_id,user_id' });
+    showOllamaToast('⭐ Voto salvato!');
+  } else {
+    const text = document.getElementById(`contrib-note-${eid}`)?.value?.trim();
+    if(!text){ showOllamaToast('Scrivi qualcosa prima'); return; }
+    if(!streetId){ showOllamaToast('Via non ancora salvata nel DB'); return; }
+    await _supa.from('contributions').insert({
+      street_id: streetId,
+      user_id: currentUser.id,
+      type: activeTab,
+      content: text
+    });
+    showOllamaToast('✓ Contributo inviato, grazie!');
+    document.getElementById(`contrib-note-${eid}`).value = '';
+  }
+  panel.classList.remove('vis');
+}
 </script>
 </body>
 </html>
