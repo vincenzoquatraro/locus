@@ -9,8 +9,7 @@
 <meta name="theme-color" content="#ffffff">
 <title>Locus</title>
 <link href="https://fonts.googleapis.com/css2?family=DM+Sans:opsz,wght@9..40,300;9..40,400;9..40,500;9..40,600&family=DM+Serif+Display:ital@0;1&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
-<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="https://maps.googleapis.com/maps/api/js?key=AIzaSyCDjB2rHzgLzwYGw8V5eboxfXKeYC6GTmY&libraries=places,geometry"></script>
 <style>
 *{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent;user-select:none}
 :root{
@@ -31,7 +30,7 @@ html,body{height:100%;height:100dvh;overflow:hidden;background:var(--off);
   flex-shrink:0;z-index:300;
   background:var(--white);
   border-bottom:1px solid var(--border);
-  padding:calc(var(--safe-top)+10px) 16px 10px;
+  padding:5px;
   position:relative;
 }
 .tb1{display:flex;align-items:center;justify-content:space-between;gap:8px}
@@ -61,7 +60,9 @@ html,body{height:100%;height:100dvh;overflow:hidden;background:var(--off);
 /* settings icon button */
 #settings-btn{
   width:34px;height:34px;border-radius:50%;
-  border:1px solid var(--border);background:var(--off);
+  border: none;
+  background:  transparent;
+  /* border:1px solid var(--border);background:var(--off); */
   display:flex;align-items:center;justify-content:center;
   font-size:16px;cursor:pointer;flex-shrink:0;
   transition:all .15s;
@@ -121,9 +122,9 @@ html,body{height:100%;height:100dvh;overflow:hidden;background:var(--off);
 /* ── MAP CONTROLS BAR — sits between topbar and map zone ── */
 #map-controls{
   flex-shrink:0;
-  display:flex;align-items:center;justify-content:flex-end;
+  display:flex;align-items:end;justify-content:flex-end;
   gap:8px;padding:6px 14px 0;
-  background:var(--off);
+  background: transparent;
   z-index:250;
 }
 .ctrl-btn{
@@ -157,16 +158,30 @@ html,body{height:100%;height:100dvh;overflow:hidden;background:var(--off);
 
 /* ── SETTINGS SIDEBAR ── */
 #settings-sidebar{
-  width:0;overflow:hidden;
+  position:absolute;
+  top:-15px;
+  right:20px;
+
+  width:0;
+  overflow:hidden;
+
   background:var(--white);
-  border-left:0px solid var(--border);
-  flex-shrink:0;
-  transition:width .3s cubic-bezier(.4,0,.2,1), border-width .3s;
-  display:flex;flex-direction:column;
+  border:1px solid var(--border);
+  border-radius:12px;
+
+  box-shadow:0 8px 25px rgba(0,0,0,0.15);
+
+  transition:width .2s cubic-bezier(.4,0,.2,1);
+  z-index:99999;
+
+  display:flex;
+  visibility: hidden;
+  flex-direction:column;
 }
+
 #settings-sidebar.vis{
   width:200px;
-  border-left-width:1px;
+  visibility: visible;
 }
 #settings-inner{
   padding:14px;
@@ -204,8 +219,7 @@ html,body{height:100%;height:100dvh;overflow:hidden;background:var(--off);
   display:flex;align-items:center;justify-content:center;
   height:20px;cursor:ns-resize;
   background:var(--white);
-  touch-action:none;
-  user-select:none;
+  touch-action:none;user-select:none;
 }
 #tl-grab-pill{
   width:36px;height:4px;border-radius:2px;
@@ -220,24 +234,37 @@ html,body{height:100%;height:100dvh;overflow:hidden;background:var(--off);
   position:relative;width:100%;height:100%;
   border-radius:18px;overflow:hidden;
   box-shadow:0 2px 16px rgba(0,0,0,.12);border:1px solid rgba(0,0,0,.06);
+  transition:border-radius .3s cubic-bezier(.4,0,.2,1), box-shadow .3s;
+}
+
+/* Mappa espansa — niente padding, niente bordi */
+#map-zone.expanded{
+  padding:0 !important;
+}
+#map-zone.expanded #map-card{
+  border-radius:0;
+  box-shadow:none;
+  border:none;
 }
 #map{width:100%;height:100%;}
-.leaflet-control-attribution{display:none!important}
-.leaflet-control-zoom{border:none!important;border-radius:10px!important;overflow:hidden;
-  box-shadow:0 2px 8px rgba(0,0,0,.1)!important;margin:8px!important}
-.leaflet-control-zoom a{width:30px!important;height:30px!important;line-height:30px!important;
-  background:white!important;color:var(--ink)!important;font-size:14px!important;border:none!important}
-.u-dot{width:12px;height:12px;border-radius:50%;background:var(--blue);
-  border:2.5px solid white;box-shadow:0 0 0 3px rgba(0,122,255,.18)}
-#cone-svg{display:none} /* retired */
+/* Google Maps — rimuovi branding */
+.gm-style-cc, .gm-bundled-control-on-bottom { display:none !important }
+.gmnoprint a, .gmnoprint span, .gm-style-cc { display:none }
 
-/* ── USER SVG (Google Maps style dot + cone) ── */
-#user-svg{ overflow:visible }
-/* hide leaflet's default blue dot since we draw our own */
-.u-dot{ display:none }
-
-/* old compass arrow — retired */
-#compass-arrow{ display:none }
+/* ── ZOOM CONTROLS custom ── */
+#custom-zoom{
+  display:flex;flex-direction:column;gap:4px;
+  margin-right:10px;
+}
+#custom-zoom button{
+  width:30px;height:30px;border-radius:8px;
+  background:white;border:none;
+  box-shadow:0 1px 6px rgba(0,0,0,.15);
+  font-size:16px;font-weight:400;color:var(--ink2);
+  cursor:pointer;display:flex;align-items:center;justify-content:center;
+  transition:all .15s;line-height:1;
+}
+#custom-zoom button:active{background:var(--ink);color:white;transform:scale(.92)}
 #route-bar{position:absolute;bottom:8px;left:8px;right:8px;z-index:9000;
   background:white;border-radius:11px;padding:9px 12px;
   box-shadow:0 2px 12px rgba(0,0,0,.1);display:none}
@@ -295,21 +322,47 @@ html,body{height:100%;height:100dvh;overflow:hidden;background:var(--off);
   scroll-behavior:smooth;scrollbar-width:none}
 #tl-scroll::-webkit-scrollbar{display:none}
 
+/* ── MAP MODE: tl-section occupa lo spazio rimanente ── */
+#tl-section.map-mode{
+  flex:1;
+  background:var(--white);
+}
+#tl-section.map-mode #tl-scroll{
+  overflow-y:auto;
+  flex:1;
+}
+/* Nascondi tutto dentro tl-scroll tranne street-banner */
+#tl-section.map-mode #next-card,
+#tl-section.map-mode #tl-entries,
+#tl-section.map-mode #ollama-dbg{
+  display:none !important;
+}
+#tl-section.map-mode #street-banner{
+  margin:10px 14px;
+  border-radius:14px;
+  box-shadow:0 2px 12px rgba(0,0,0,.08);
+}
+
 /* timeline entry — animated in */
 .tl-e{
-  display:flex;gap:11px;padding:12px 16px 0;
+  display:flex;gap:11px;padding:12px 16px 0; flex-direction: row;
   opacity:0;transform:translateY(10px);
   animation:tlIn .4s cubic-bezier(.34,1.1,.64,1) forwards;
 }
 @keyframes tlIn{to{opacity:1;transform:translateY(0)}}
 
 .tl-l{display:flex;flex-direction:column;align-items:center;flex-shrink:0;width:32px}
-.tl-ic{width:30px;height:30px;border-radius:50%;background:var(--off);
+.tl-ic{width:28px;height:28px;border-radius:50%; background:var(--off);
   display:flex;align-items:center;justify-content:center;font-size:14px;
   border:1.5px solid var(--border);position:relative;z-index:1;transition:all .3s;flex-shrink:0}
 .tl-ic.cur{background:var(--ink);border-color:var(--ink);box-shadow:0 3px 10px rgba(0,0,0,.15)}
 .tl-ic.cur span{filter:invert(1)}
 .tl-ic.fut{opacity:.45}
+.tl-ic svg{
+  width:16px;
+  height:16px;
+  display:block;
+}
 .tl-ln{flex:1;width:1.5px;background:var(--border);margin:2px 0;min-height:12px}
 .tl-ln.dash{background:repeating-linear-gradient(to bottom,var(--border) 0,var(--border) 4px,transparent 4px,transparent 8px)}
 .tl-b{flex:1;padding-bottom:12px}
@@ -430,17 +483,19 @@ html,body{height:100%;height:100dvh;overflow:hidden;background:var(--off);
   background-size:200% 100%;animation:shimmer 1.4s infinite}
 
 #poi-popup{
-  position:absolute;
+  position:fixed;
   left:12px;
   right:12px;
-  bottom:12px;
+  bottom:calc(var(--safe-bot) + 16px);
   background:white;
-  border-radius:16px;
-  box-shadow:0 10px 30px rgba(0,0,0,.18);
-  padding:14px;
-  z-index:600;
+  border-radius:18px;
+  box-shadow:0 8px 32px rgba(0,0,0,.18);
+  padding:16px;
+  z-index:9999;
   display:none;
-  animation:popIn .25s ease;
+  animation:popIn .25s cubic-bezier(.34,1.1,.64,1);
+  max-width:480px;
+  margin:0 auto;
 }
 
 @keyframes popIn{
@@ -638,19 +693,36 @@ html,body{height:100%;height:100dvh;overflow:hidden;background:var(--off);
   padding:6px 9px;border-radius:10px;border:1px solid var(--border);
   background:var(--off);transition:all .15s;
 }
-.tl-q:active{background:var(--border)}
+.tl-q:active,.tl-q.selected{background:var(--ink);color:white;border-color:var(--ink)}
+.tl-q.selected .tl-q-ico{opacity:1}
 .tl-q-ico{font-size:11px;flex-shrink:0;margin-top:1px;opacity:.6}
-.tl-q-row{
-  display:flex;align-items:center;justify-content:space-between;
-  gap:8px;margin-top:10px;
+
+/* ── BARRA INPUT + CHIEDI DI PIÙ ── */
+.tl-ask-row{
+  display:flex;align-items:center;gap:6px;
+  margin-top:10px;
+  padding:6px 8px;
+  border:1px solid var(--border);
+  border-radius:12px;
+  background:var(--off);
+  transition:border-color .15s;
 }
+.tl-ask-row:focus-within{
+  border-color:var(--blue);background:white;
+}
+.tl-ask-input{
+  flex:1;border:none;background:transparent;
+  font-family:'DM Sans',sans-serif;font-size:12px;
+  color:var(--ink);outline:none;min-width:0;
+}
+.tl-ask-input::placeholder{color:var(--ink3)}
 .tl-ask-more{
   flex-shrink:0;display:flex;align-items:center;gap:4px;
   padding:5px 11px;border-radius:20px;
   background:var(--ink);color:white;
   font-size:10px;font-weight:600;border:none;cursor:pointer;
   font-family:'DM Sans',sans-serif;letter-spacing:.01em;
-  transition:opacity .15s;
+  transition:opacity .15s;white-space:nowrap;
 }
 .tl-ask-more:active{opacity:.7}
 .tl-ask-more.loading{background:var(--ink3);pointer-events:none}
@@ -667,6 +739,41 @@ html,body{height:100%;height:100dvh;overflow:hidden;background:var(--off);
 .wiki-badge{display:inline-block;margin-right:5px;font-size:10px;color:#636366}
 .ollama-badge{display:flex;align-items:center;gap:2px;flex-wrap:wrap;margin-top:6px}
 
+/* ── TIMELINE CARD LAYOUT ── */
+.tl-b{flex:1;padding-bottom:12px;display:flex;flex-direction:column;gap:4px}
+
+/* Immagine float destra — il testo la avvolge */
+.tl-img-figure{
+  float:right;
+  width:33%;
+  margin:0 0 6px 10px;
+  padding:0;
+}
+.tl-wiki-img{
+  width:100%;
+  max-height:160px;
+  height:auto;
+  border-radius:8px;
+  object-fit:cover;
+  object-position:center top;
+  display:block;
+}
+.tl-img-caption{
+  font-size:9px;
+  color:var(--ink3);
+  line-height:1.4;
+  margin-top:4px;
+  text-align:center;
+  font-style:italic;
+}
+.tl-content-row{
+  overflow:hidden; /* clearfix */
+}
+.tl-content-row::after{
+  content:'';display:table;clear:both;
+}
+.tl-b-has-img{ display:flex;flex-direction:column;gap:4px; }
+
 .tl-empty{
   display:flex;flex-direction:column;align-items:center;
   padding:40px 24px;text-align:center;gap:10px;
@@ -674,6 +781,7 @@ html,body{height:100%;height:100dvh;overflow:hidden;background:var(--off);
 .tl-empty-ico{font-size:32px;opacity:.4}
 .tl-empty-title{font-family:'DM Serif Display',serif;font-size:16px;color:var(--ink);opacity:.5}
 .tl-empty-sub{font-size:12px;color:var(--ink3);line-height:1.65;max-width:220px}
+
 
 </style>
 </head>
@@ -683,12 +791,18 @@ html,body{height:100%;height:100dvh;overflow:hidden;background:var(--off);
   <!-- TOPBAR -->
   <div id="topbar">
     <div class="tb1">
-      <div class="logo">locus<span class="logo-dot"></span></div>
+      <div class="logo">locus <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24"><path fill="none" stroke="currentColor" stroke-dasharray="48" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 20.5c0 0 -6 -7 -6 -11.5c0 -3.31 2.69 -6 6 -6c3.31 0 6 2.69 6 6c0 4.5 -6 11.5 -6 11.5Z"><animate fill="freeze" attributeName="stroke-dashoffset" dur="0.6s" values="48;0"/><animateTransform attributeName="transform" dur="3s" keyTimes="0;0.3;0.4;0.54;0.6;0.68;0.7;1" repeatCount="indefinite" type="rotate" values="0 12 20.5;0 12 20.5;-8 12 20.5;0 12 20.5;5 12 20.5;-2 12 20.5;0 12 20.5;0 12 20.5"/></path><circle cx="12" cy="9" fill="currentColor"><animate fill="freeze" attributeName="r" begin="0.7s" dur="0.2s" to="2.5"/></circle></svg></div>
       <div class="mode-pills">
         <button class="mpill on" id="pill-e" onclick="setMode('explore')">Esplora</button>
         <button class="mpill" id="pill-n" onclick="setMode('navigate')">Naviga</button>
       </div>
-      <button id="settings-btn" onclick="toggleSettings()" title="Impostazioni">⚙️</button>
+        <div id="map-controls">
+    <button class="ctrl-btn" onclick="centerUser()" title="Centrati"><svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24"><g fill="none" fill-rule="evenodd"><path d="m12.593 23.258l-.011.002l-.071.035l-.02.004l-.014-.004l-.071-.035q-.016-.005-.024.005l-.004.01l-.017.428l.005.02l.01.013l.104.074l.015.004l.012-.004l.104-.074l.012-.016l.004-.017l-.017-.427q-.004-.016-.017-.018m.265-.113l-.013.002l-.185.093l-.01.01l-.003.011l.018.43l.005.012l.008.007l.201.093q.019.005.029-.008l.004-.014l-.034-.614q-.005-.018-.02-.022m-.715.002a.02.02 0 0 0-.027.006l-.006.014l-.034.614q.001.018.017.024l.015-.002l.201-.093l.01-.008l.004-.011l.017-.43l-.003-.012l-.01-.01z"/><path fill="currentColor" d="M7 7a5 5 0 1 1 6 4.9V17a1 1 0 1 1-2 0v-5.1A5 5 0 0 1 7 7m2.489 9.1a1 1 0 0 1-.838 1.14c-1.278.195-2.293.489-2.96.815c-.335.164-.534.313-.637.422l-.021.023c.033.039.09.096.19.169c.28.207.749.435 1.418.644C7.968 19.728 9.863 20 12 20s4.032-.272 5.359-.687c.67-.209 1.138-.437 1.418-.644c.1-.073.157-.13.19-.169l-.021-.023c-.103-.109-.302-.258-.637-.422c-.667-.326-1.682-.62-2.96-.815a1 1 0 1 1 .301-1.977c1.388.21 2.622.547 3.539.996c.457.224.884.5 1.208.842c.33.347.603.82.603 1.399c0 .811-.524 1.4-1.034 1.777c-.53.392-1.233.702-2.01.945c-1.57.49-3.674.778-5.956.778s-4.387-.288-5.955-.778c-.778-.243-1.48-.553-2.01-.945C3.524 19.9 3 19.311 3 18.5c0-.58.273-1.052.603-1.4c.325-.342.751-.617 1.208-.84c.917-.45 2.152-.786 3.538-.997a1 1 0 0 1 1.14.838Z"/></g></svg></button>
+    <button class="ctrl-btn" id="sim-btn" onclick="toggleSim()" title="Simula passeggiata">
+      <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24"><g fill="none"><path d="m12.593 23.258l-.011.002l-.071.035l-.02.004l-.014-.004l-.071-.035q-.016-.005-.024.005l-.004.01l-.017.428l.005.02l.01.013l.104.074l.015.004l.012-.004l.104-.074l.012-.016l.004-.017l-.017-.427q-.004-.016-.017-.018m.265-.113l-.013.002l-.185.093l-.01.01l-.003.011l.018.43l.005.012l.008.007l.201.093q.019.005.029-.008l.004-.014l-.034-.614q-.005-.018-.02-.022m-.715.002a.02.02 0 0 0-.027.006l-.006.014l-.034.614q.001.018.017.024l.015-.002l.201-.093l.01-.008l.004-.011l.017-.43l-.003-.012l-.01-.01z"/><path fill="currentColor" d="M12 2a3 3 0 0 1 .866 5.873l-.17.046l2.427 2.775l1.824.911a1 1 0 0 1-.787 1.836l-.107-.047l-1.824-.912a2 2 0 0 1-.476-.332l-.135-.14l-1.018-1.163l-.66 2.638a2 2 0 0 1-.306.669l-.11.142l1.928 1.763a2 2 0 0 1 .544.83l.047.16l.738 2.951H15a1 1 0 0 1 .117 1.993L15 22h-.922a1.1 1.1 0 0 1-1.03-.714l-.037-.12l-.908-3.631l-3.01-2.752a2 2 0 0 1-1.067-2.105l.034-.163l.513-2.052l-.323.23l-1.393 2.322a1 1 0 0 1-1.769-.926l.054-.104l1.393-2.321a2 2 0 0 1 .423-.498l.13-.1L9.85 7.091A3 3 0 0 1 12 2M9.316 15.551a1 1 0 0 1 .633 1.265l-.426 1.276a2 2 0 0 1-.483.782l-1.657 1.657a1 1 0 0 1-1.59 1.176l-.493-.493a1.01 1.01 0 0 1 0-1.428l2.326-2.326l.425-1.276a1 1 0 0 1 1.265-.633"/></g></svg>
+    </button>
+  </div>
+      <button id="settings-btn" onclick="toggleSettings()" title="Impostazioni"><svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24"><g fill="none" fill-rule="evenodd"><path d="m12.593 23.258l-.011.002l-.071.035l-.02.004l-.014-.004l-.071-.035q-.016-.005-.024.005l-.004.01l-.017.428l.005.02l.01.013l.104.074l.015.004l.012-.004l.104-.074l.012-.016l.004-.017l-.017-.427q-.004-.016-.017-.018m.265-.113l-.013.002l-.185.093l-.01.01l-.003.011l.018.43l.005.012l.008.007l.201.093q.019.005.029-.008l.004-.014l-.034-.614q-.005-.018-.02-.022m-.715.002a.02.02 0 0 0-.027.006l-.006.014l-.034.614q.001.018.017.024l.015-.002l.201-.093l.01-.008l.004-.011l.017-.43l-.003-.012l-.01-.01z"/><path fill="currentColor" d="M18 4a1 1 0 1 0-2 0v1H4a1 1 0 0 0 0 2h12v1a1 1 0 1 0 2 0V7h2a1 1 0 1 0 0-2h-2zM4 11a1 1 0 1 0 0 2h2v1a1 1 0 1 0 2 0v-1h12a1 1 0 1 0 0-2H8v-1a1 1 0 0 0-2 0v1zm-1 7a1 1 0 0 1 1-1h12v-1a1 1 0 1 1 2 0v1h2a1 1 0 1 1 0 2h-2v1a1 1 0 1 1-2 0v-1H4a1 1 0 0 1-1-1"/></g></svg> </button>
     </div>
 
     <div id="nav-search">
@@ -702,10 +816,10 @@ html,body{height:100%;height:100dvh;overflow:hidden;background:var(--off);
   </div>
 
   <!-- MAP CONTROLS — above map, outside it -->
-  <div id="map-controls">
+  <!-- <div id="map-controls">
     <button class="ctrl-btn" onclick="centerUser()" title="Centrati">📍</button>
     <button class="ctrl-btn" id="sim-btn" onclick="toggleSim()" title="Simula passeggiata">🚶</button>
-  </div>
+  </div> -->
 
   <!-- MAP ROW: mappa + sidebar impostazioni -->
   <div id="map-row">
@@ -751,10 +865,7 @@ html,body{height:100%;height:100dvh;overflow:hidden;background:var(--off);
       <div id="poi-popup"></div>
     </div>
     <div id="orbit-layer"></div>
-  </div><!-- /map-zone -->
-
-  <!-- SETTINGS SIDEBAR -->
-  <div id="settings-sidebar">
+      <div id="settings-sidebar">
     <div id="settings-inner">
       <div class="sp-title">Filtri</div>
       <div id="filter-bar">
@@ -788,6 +899,10 @@ html,body{height:100%;height:100dvh;overflow:hidden;background:var(--off);
     </div>
   </div><!-- /settings-sidebar -->
 
+  </div><!-- /map-zone -->
+
+  <!-- SETTINGS SIDEBAR -->
+
   </div><!-- /map-row -->
 
   <!-- TIMELINE -->
@@ -799,7 +914,7 @@ html,body{height:100%;height:100dvh;overflow:hidden;background:var(--off);
     <div id="tl-scroll">
       <!-- CURRENT STREET -->
       <div id="street-banner">
-        <div class="sb-icon">📍</div>
+        <div class="sb-icon"><svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24"><g fill="none" fill-rule="evenodd"><path d="m12.593 23.258l-.011.002l-.071.035l-.02.004l-.014-.004l-.071-.035q-.016-.005-.024.005l-.004.01l-.017.428l.005.02l.01.013l.104.074l.015.004l.012-.004l.104-.074l.012-.016l.004-.017l-.017-.427q-.004-.016-.017-.018m.265-.113l-.013.002l-.185.093l-.01.01l-.003.011l.018.43l.005.012l.008.007l.201.093q.019.005.029-.008l.004-.014l-.034-.614q-.005-.018-.02-.022m-.715.002a.02.02 0 0 0-.027.006l-.006.014l-.034.614q.001.018.017.024l.015-.002l.201-.093l.01-.008l.004-.011l.017-.43l-.003-.012l-.01-.01z"/><path fill="currentColor" d="M7 7a5 5 0 1 1 6 4.9V17a1 1 0 1 1-2 0v-5.1A5 5 0 0 1 7 7m2.489 9.1a1 1 0 0 1-.838 1.14c-1.278.195-2.293.489-2.96.815c-.335.164-.534.313-.637.422l-.021.023c.033.039.09.096.19.169c.28.207.749.435 1.418.644C7.968 19.728 9.863 20 12 20s4.032-.272 5.359-.687c.67-.209 1.138-.437 1.418-.644c.1-.073.157-.13.19-.169l-.021-.023c-.103-.109-.302-.258-.637-.422c-.667-.326-1.682-.62-2.96-.815a1 1 0 1 1 .301-1.977c1.388.21 2.622.547 3.539.996c.457.224.884.5 1.208.842c.33.347.603.82.603 1.399c0 .811-.524 1.4-1.034 1.777c-.53.392-1.233.702-2.01.945c-1.57.49-3.674.778-5.956.778s-4.387-.288-5.955-.778c-.778-.243-1.48-.553-2.01-.945C3.524 19.9 3 19.311 3 18.5c0-.58.273-1.052.603-1.4c.325-.342.751-.617 1.208-.84c.917-.45 2.152-.786 3.538-.997a1 1 0 0 1 1.14.838Z"/></g></svg></div>
         <div class="sb-text">
           <div class="sb-label">Sei in</div>
           <div class="sb-street loading" id="sb-street"></div>
@@ -934,26 +1049,30 @@ ollama serve</div>
 
   function openPOIPopup(p){
   const popup=document.getElementById('poi-popup');
-
+  const dist = uPos ? fmt(hav(uPos.lat,uPos.lng,p.lat,p.lon)) : '';
   popup.innerHTML=`
     ${p.img?`<div class="pp-img" style="background-image:url('${p.img}')"></div>`:''}
     <div class="pp-top">
       <span>${p.emoji}</span>
       <span>${CATS[p.cat]||p.cat}</span>
+      ${dist?`<span style="margin-left:auto;color:var(--blue);font-weight:600">${dist}</span>`:''}
     </div>
     <div class="pp-title">${p.name}</div>
     <div class="pp-text">${p.text}</div>
     <div class="pp-actions">
-      <button class="pp-go" onclick='goToPOI(${p.id})'>Vai qui</button>
+      <button class="pp-go" onclick='goToPOI(${p.id})'>🧭 Naviga qui</button>
       <button class="pp-close" onclick="closePOIPopup()">✕</button>
     </div>
   `;
-
   popup.style.display='block';
 }
 
 function closePOIPopup(){
   document.getElementById('poi-popup').style.display='none';
+  // Torna a seguire l'utente
+  _poiSelectedId = null;
+  if(_poiReturnTimer){ clearTimeout(_poiReturnTimer); _poiReturnTimer=null; }
+  if(uPos&&map) map.panTo({lat:uPos.lat, lng:uPos.lng});
 }
 
 function goToPOI(id){
@@ -965,24 +1084,7 @@ function goToPOI(id){
 }
 // ━━━━━━━ DATA ━━━━━━━
 const ORS_KEY = '';
-const PD = [
-  {id:1,name:'Piazza Navona',cat:'monument',emoji:'🏛️',lo:.0022,ln:.0012,
-   text:'Costruita sullo stadio di Domiziano nel I sec. d.C. La Fontana dei Quattro Fiumi di Bernini è un capolavoro di teatralità barocca che ancora oggi toglie il fiato.'},
-  {id:2,name:'Trattoria da Enzo',cat:'food',emoji:'🍽️',lo:-.0013,ln:.0025,
-   text:'Cucina romana autentica dal 1962 — la carbonara ancora con guanciale e pecorino, senza panna. La fila fuori è lunga e giusta.'},
-  {id:3,name:'Pantheon',cat:'monument',emoji:'⛩️',lo:.0035,ln:-.0014,
-   text:"L'oculus è aperto alla pioggia. In 2000 anni nessuno ha trovato un sistema migliore per smaltirla — il pavimento convesso drena tutto da solo."},
-  {id:4,name:'Galleria Doria Pamphilj',cat:'art',emoji:'🎨',lo:.0028,ln:.0038,
-   text:'Ancora di proprietà della famiglia. Il ritratto di Innocenzo X del Velázquez — che il pittore stesso considerava il suo capolavoro assoluto — è qui.'},
-  {id:5,name:"Giardini dell'Arancio",cat:'nature',emoji:'🌿',lo:-.0048,ln:.0015,
-   text:'Il belvedere più bello di Roma che quasi nessuno conosce. Il terrazzino al tramonto vale una deviazione di venti minuti.'},
-  {id:6,name:"Campo de' Fiori",cat:'monument',emoji:'🌸',lo:-.0025,ln:-.0028,
-   text:"Di mattina mercato, di sera aperitivi. Giordano Bruno al centro fu bruciato qui nel 1600. Una piazza che non ha mai smesso di essere viva."},
-  {id:7,name:'Bar San Calisto',cat:'food',emoji:'☕',lo:-.0035,ln:-.001,
-   text:'Il bar preferito di Trastevere. Caffè a 1 euro, tavolini fuori, la sensazione di aver trovato il posto giusto.'},
-  {id:8,name:'Basilica di Santa Maria',cat:'monument',emoji:'⛪',lo:-.002,ln:-.0038,
-   text:'Una delle basiliche più antiche di Roma. I mosaici del XII secolo sono tra le cose più belle visibili senza fila.'},
-];
+const PD = []; // POI caricati dinamicamente da Overpass API
 const CATS={monument:'Monumento',food:'Cucina',art:'Arte',nature:'Natura',shop:'Shopping'};
 const DIRS=['↑','↗','→','↘','↓','↙','←','↖'];
 const DLBL=['nord','nord-est','est','sud-est','sud','sud-ovest','ovest','nord-ovest'];
@@ -1003,7 +1105,7 @@ const SIM_MESSAGES = [
 ];
 
 // ━━━━━━━ STATE ━━━━━━━
-let map, uMark, rLayer, dMark, pLayers={};
+let map, uMarker, rPolyline, dMarker, pMarkers={};
 let uPos=null, places=[], selId=null;
 let mode='explore', filters=new Set(['all']);
 let heading=0;
@@ -1018,11 +1120,6 @@ let lastPushedPOIId=null;
 const OLLAMA_URL = 'https://domonique-procompensation-elvin.ngrok-free.dev';
 let ollamaIP = OLLAMA_URL;
 let ollamaEnabled = true;
-// Solo Content-Type — ngrok-skip-browser-warning causa errori CORS preflight
-const OLLAMA_HDR = {
-  'Content-Type': 'application/json',
-  'Accept': 'application/json'
-};
 let lastStreetName = '';
 let lastOllamaStreet = '';
 let ollamaIntervalId = null;
@@ -1030,28 +1127,82 @@ let ollamaLoading = false;
 let currentCountry = '';
 let currentCity = '';
 
-// ━━━━━━━ MAP ━━━━━━━
+// ━━━━━━━ MAP — Google Maps ━━━━━━━
 function initMap(lat,lng){
-  if(map){map.setView([lat,lng],16);return;}
-  map=L.map('map',{zoomControl:true,attributionControl:false}).setView([lat,lng],16);
-  L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png',{maxZoom:19}).addTo(map);
-  map.on('click',onMapClick);
-  map.on('move zoom',()=>{updateCone();renderOrbs();});
+  if(map){ map.panTo({lat,lng}); return; }
+  map = new google.maps.Map(document.getElementById('map'),{
+    center:{lat,lng}, zoom:16,
+    disableDefaultUI: true,
+    styles:[
+      {featureType:'poi',stylers:[{visibility:'off'}]},
+      {featureType:'transit',stylers:[{visibility:'off'}]},
+      {elementType:'labels.icon',stylers:[{visibility:'off'}]},
+      {featureType:'road',elementType:'geometry',stylers:[{color:'#ffffff'}]},
+      {featureType:'road',elementType:'labels.text.fill',stylers:[{color:'#9e9e9e'}]},
+      {featureType:'landscape',stylers:[{color:'#f5f5f5'}]},
+      {featureType:'water',stylers:[{color:'#c9d6e3'}]},
+      {featureType:'administrative',elementType:'labels.text.fill',stylers:[{color:'#6e6e73'}]}
+    ]
+  });
+  map.addListener('click', e => onMapClick(e));
+  map.addListener('idle', ()=>{ updateCone(); renderOrbs(); });
+  map.addListener('center_changed', ()=>{ updateCone(); });
+
+  // Quando l'utente trascina la mappa, smetti di seguirlo
+  map.addListener('dragstart', ()=>{
+    _setFollow(false);
+    if(_followReturnTimer){ clearTimeout(_followReturnTimer); _followReturnTimer=null; }
+  });
+
+  // Zoom controls custom — piccoli e moderni
+  const zoomDiv = document.createElement('div');
+  zoomDiv.innerHTML = `
+    <div id="custom-zoom">
+      <button id="zoom-in"  onclick="map.setZoom(map.getZoom()+1)">+</button>
+      <button id="zoom-out" onclick="map.setZoom(map.getZoom()-1)">−</button>
+    </div>`;
+  map.controls[google.maps.ControlPosition.RIGHT_CENTER].push(zoomDiv.firstElementChild);
 }
+
 function placeUser(lat,lng){
-  const ic=L.divIcon({className:'',html:'<div class="u-dot"></div>',iconSize:[12,12],iconAnchor:[6,6]});
-  if(uMark){uMark.setLatLng([lat,lng]);return;}
-  uMark=L.marker([lat,lng],{icon:ic,zIndexOffset:999}).addTo(map);
+  if(uMarker){ uMarker.setPosition({lat,lng}); return; }
+  uMarker = new google.maps.Marker({
+    position:{lat,lng}, map,
+    icon:{ path:google.maps.SymbolPath.CIRCLE, scale:0 },
+    zIndex:999
+  });
 }
-function centerUser(){if(uPos&&map)map.flyTo([uPos.lat,uPos.lng],16,{duration:.8});}
+
+function centerUser(){
+  _followUser = true;
+  _poiSelectedId = null;
+  if(_poiReturnTimer){ clearTimeout(_poiReturnTimer); _poiReturnTimer=null; }
+  if(uPos&&map) map.panTo({lat:uPos.lat,lng:uPos.lng});
+}
 
 // ━━━━━━━ USER DOT + DIRECTION CONE (Google Maps style) ━━━━━━━
+function latLngToPixel(lat, lng){
+  if(!map) return {x:0,y:0};
+  const proj = map.getProjection();
+  if(!proj) return {x:0,y:0};
+  const bounds = map.getBounds();
+  if(!bounds) return {x:0,y:0};
+  const topRight = proj.fromLatLngToPoint(bounds.getNorthEast());
+  const bottomLeft = proj.fromLatLngToPoint(bounds.getSouthWest());
+  const scale = Math.pow(2, map.getZoom());
+  const worldPoint = proj.fromLatLngToPoint(new google.maps.LatLng(lat, lng));
+  const mapEl = document.getElementById('map');
+  return {
+    x: (worldPoint.x - bottomLeft.x) * scale,
+    y: (worldPoint.y - topRight.y) * scale
+  };
+}
+
 function updateCone(){
   if(!map||!uPos)return;
-  const pt=map.latLngToContainerPoint([uPos.lat,uPos.lng]);
+  const pt = latLngToPixel(uPos.lat, uPos.lng);
   const cx=pt.x, cy=pt.y;
 
-  // Show user dot
   const dotG=document.getElementById('user-dot-group');
   const outer=document.getElementById('ud-outer');
   const inner=document.getElementById('ud-inner');
@@ -1061,13 +1212,9 @@ function updateCone(){
   inner.setAttribute('cx',cx); inner.setAttribute('cy',cy);
   pulse.setAttribute('cx',cx); pulse.setAttribute('cy',cy);
 
-  // Hide leaflet's default marker (we draw our own)
-  if(uMark) uMark.setOpacity(0);
-
-  // Draw direction cone — 60° wide spicchio, 90px long
   const coneG=document.getElementById('cone-group');
   const conePath=document.getElementById('cone-path');
-  const CONE_LEN=90, CONE_HALF=30; // degrees half-angle
+  const CONE_LEN=90, CONE_HALF=30;
   const rad=Math.PI/180;
   const lAng=(heading-CONE_HALF-90)*rad;
   const rAng=(heading+CONE_HALF-90)*rad;
@@ -1075,12 +1222,7 @@ function updateCone(){
   const ly=cy+Math.sin(lAng)*CONE_LEN;
   const rx=cx+Math.cos(rAng)*CONE_LEN;
   const ry=cy+Math.sin(rAng)*CONE_LEN;
-  // Arc for the far edge
-  const lxA=cx+Math.cos(lAng)*CONE_LEN;
-  const lyA=cy+Math.sin(lAng)*CONE_LEN;
-  conePath.setAttribute('d',
-    `M${cx},${cy} L${lx},${ly} A${CONE_LEN},${CONE_LEN} 0 0,1 ${rx},${ry} Z`
-  );
+  conePath.setAttribute('d',`M${cx},${cy} L${lx},${ly} A${CONE_LEN},${CONE_LEN} 0 0,1 ${rx},${ry} Z`);
   coneG.style.display='';
 }
 
@@ -1114,15 +1256,43 @@ function requestGPS(){
     },
     {enableHighAccuracy:true, timeout:14000, maximumAge:0}
   );
+// ── auto-follow: true = mappa segue utente, false = utente ha spostato la mappa
+let _followUser = true;
+let _poiSelectedId = null;
+let _poiReturnTimer = null;
+let _followReturnTimer = null;
+
+function _setFollow(val){
+  _followUser = val;
+  const btn = document.getElementById('btn-center');
+  if(btn){
+    btn.style.background = val ? 'var(--white)' : 'var(--blue)';
+    btn.style.color      = val ? ''             : 'white';
+    btn.title = val ? 'Centrati' : 'Torna alla tua posizione';
+  }
+}
+
   navigator.geolocation.watchPosition(
     p=>{
       hideGpsIndicator();
-      const{latitude:lat,longitude:lng,heading:h}=p.coords;
+      const{latitude:lat,longitude:lng}=p.coords;
       uPos={lat,lng,_r:true};
-      if(h!=null)heading=h;
+      updateGpsHeading(p.coords);
+      if(_isMoving && _gpsHeading != null){
+        const diff=((_gpsHeading-heading+540)%360)-180;
+        heading=(heading+0.4*diff+360)%360;
+      }
       placeUser(lat,lng); updateCone(); renderOrbs();
       if(mode==='navigate'&&rData)updateNav();
       fetchStreet(lat,lng);
+      // Aggiorna posizione sulla mappa solo se in follow mode
+      if(_followUser && map){
+        if(_poiSelectedId !== null){
+          _fitUserAndPOI(_poiSelectedId);
+        } else {
+          map.panTo({lat, lng});
+        }
+      }
     },
     ()=>{},
     {enableHighAccuracy:true}
@@ -1142,39 +1312,59 @@ function requestCompass(){
     window.addEventListener('deviceorientation',onOrient,true);
   }
 }
-// Low-pass filter for compass — α=0.15 smooths jitter without lag
-const COMPASS_ALPHA = 0.25; // responsive ma smussato
-let _rawHeading = null;
+// ━━━━━━━ SENSOR FUSION HEADING ━━━━━━━
+const FUSION_GPS_SPEED_THRESHOLD = 0.8;
+const FUSION_ALPHA_MOVING  = 0.5;
+const FUSION_ALPHA_STILL   = 0.08;
+const FUSION_GPS_WEIGHT    = 0.7;
+
+let _rawHeading   = null;
+let _gpsHeading   = null;
+let _gpsSpeed     = 0;
 let _lastOrientTime = 0;
+let _isMoving     = false;
+
+function updateGpsHeading(coords){
+  if(coords.heading != null && !isNaN(coords.heading)) _gpsHeading = coords.heading;
+  if(coords.speed   != null && !isNaN(coords.speed)){
+    _gpsSpeed = coords.speed;
+    _isMoving = coords.speed > FUSION_GPS_SPEED_THRESHOLD;
+  }
+}
 
 function onOrient(e){
-  // Throttle a 50ms (20fps) — abbastanza veloce, no jitter da flood
   const now = Date.now();
-  if(now - _lastOrientTime < 50) return;
+  if(now - _lastOrientTime < 40) return;
   _lastOrientTime = now;
 
   let raw = null;
-  if(e.webkitCompassHeading != null){
-    raw = e.webkitCompassHeading;
-  } else if(e.absolute && e.alpha != null){
-    raw = (360 - e.alpha + 360) % 360;
-  } else if(e.alpha != null){
-    raw = (360 - e.alpha + 360) % 360;
-  } else {
-    return;
-  }
+  if(e.webkitCompassHeading != null)       raw = e.webkitCompassHeading;
+  else if(e.absolute && e.alpha != null)   raw = (360 - e.alpha + 360) % 360;
+  else if(e.alpha != null)                 raw = (360 - e.alpha + 360) % 360;
+  else return;
 
-  if(_rawHeading === null){ _rawHeading = raw; heading = raw; }
+  if(_rawHeading === null){ _rawHeading = raw; }
   else {
-    // Shortest-path delta per gestire il wraparound 359°→0°
     let delta = raw - _rawHeading;
     if(delta > 180) delta -= 360;
     if(delta < -180) delta += 360;
     _rawHeading = (_rawHeading + delta + 360) % 360;
-    // Low-pass filter: segue rapidamente grandi rotazioni, smussato su piccole
-    const diff = ((_rawHeading - heading + 540) % 360) - 180;
-    heading = (heading + COMPASS_ALPHA * diff + 360) % 360;
   }
+
+  let target;
+  if(_isMoving && _gpsHeading != null){
+    let diff = _gpsHeading - _rawHeading;
+    if(diff > 180) diff -= 360;
+    if(diff < -180) diff += 360;
+    target = (_rawHeading + FUSION_GPS_WEIGHT * diff + 360) % 360;
+  } else {
+    target = _rawHeading;
+  }
+
+  const alpha = _isMoving ? FUSION_ALPHA_MOVING : FUSION_ALPHA_STILL;
+  const diff = ((target - heading + 540) % 360) - 180;
+  heading = (heading + alpha * diff + 360) % 360;
+
   updateCone();
   renderOrbs();
 }
@@ -1323,12 +1513,8 @@ let searchRadius = 600; // meters, user-adjustable
 let overpassAbort = null;
 
 function loadPlaces(lat, lng) {
-  // Always show mock data immediately as fallback
-  places = PD.map(p=>({...p, lat:lat+p.lo, lon:lng+p.ln,
-    dist:Math.round(hav(lat,lng,lat+p.lo,lng+p.ln))})).sort((a,b)=>a.dist-b.dist);
+  places = [];
   renderPins([]); renderOrbs(); buildTL();
-
-  // Then fetch real POIs from Overpass
   fetchOverpass(lat, lng, searchRadius);
 }
 
@@ -1466,52 +1652,57 @@ function toggleF(el,cat){
 // ━━━━━━━
 function renderOrbs(){
   if(!uPos||!map)return;
+  const layer=document.getElementById('orbit-layer');
+
+  // In modalità CONTENT (mappa piccola) nascondi gli orb
+  const tlSection=document.getElementById('tl-section');
+  const mapRow=document.getElementById('map-row');
+  const mapRowH=mapRow?.offsetHeight||0;
+  const VH=window.innerHeight;
+  const SNAP_CONTENT=Math.round(VH*0.22);
+  const isContent = mapRowH <= SNAP_CONTENT + 20;
+  if(isContent){ layer.innerHTML=''; return; }
+
   const zone=document.getElementById('map-zone');
   const card=document.getElementById('map-card');
   const ZW=zone.offsetWidth, ZH=zone.offsetHeight;
-  const margin=parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--margin'))||42;
   const CW=card.offsetWidth, CH=card.offsetHeight;
-  // card rect within zone coords
-  const cardLeft=margin, cardTop=8; // padding-top is 8px
-  const cardRight=cardLeft+CW, cardBottom=cardTop+CH;
-  const ZCX=ZW/2, ZCY=(cardTop+CH/2); // vertical center of card in zone
+  const cardLeft=0, cardTop=0;
+  const ZCX=ZW/2, ZCY=CH/2;
+
+  // In modalità MAP, aggiungi padding in basso per non tagliare gli orb col grab
+  const isMapMode = tlSection.classList.contains('map-mode');
+  const grabH = 22; // altezza del grab handle
+  const bottomPad = isMapMode ? grabH + 16 : 8;
 
   const visible=vp();
-  if(!visible.length){document.getElementById('orbit-layer').innerHTML='';hideNextCard();return;}
+  if(!visible.length){ layer.innerHTML=''; hideNextCard(); return; }
 
   const dists=visible.map(p=>p.dist);
   const mx=Math.max(...dists,1), mn=Math.min(...dists,1);
-  const layer=document.getElementById('orbit-layer');
   layer.innerHTML='';
   const sortedByDist=[...visible].sort((a,b)=>a.dist-b.dist);
 
   visible.forEach(p=>{
-    // is this POI visible on the map card?
-    const screenPt=map.latLngToContainerPoint([p.lat,p.lon]);
-    // screenPt is relative to map-card (leaflet container)
-    // convert to zone coords: add cardLeft, cardTop
-    const ptZX=screenPt.x+cardLeft, ptZY=screenPt.y+cardTop;
+    const screenPt = latLngToPixel(p.lat, p.lon);
     const onScreen=screenPt.x>4&&screenPt.x<CW-4&&screenPt.y>4&&screenPt.y<CH-4;
-    if(onScreen)return; // POI visible on map → skip orb
+    if(onScreen)return;
 
-    // bearing from user
     const bear=brng(uPos.lat,uPos.lng,p.lat,p.lon);
     const rel=((bear-heading)+360)%360;
     const norm=1-((p.dist-mn)/(mx-mn+1));
     const sz=Math.round(24+norm*22);
+    const pad=sz/2+4;
 
-    // place on border of FULL zone rect
-    const{x,y}=borderPt(ZCX,ZCY,ZW,ZH,rel,sz/2+4);
+    // borderPt con padding inferiore extra in MAP mode
+    const{x,y}=borderPtPadded(ZCX,ZCY,ZW,ZH,rel,pad,bottomPad);
 
     const orb=document.createElement('div');
     orb.className='orb'+(p.id===selId?' sel':'');
     orb.style.cssText=`left:${x}px;top:${y}px;width:${sz}px;height:${sz}px;`+
       `font-size:${Math.round(sz*.47)}px;opacity:${.45+norm*.55}`;
     orb.textContent=p.emoji;
-    orb.onclick=()=>{
-  selPOI(p.id);
-  openPOIPopup(p);
-};
+    orb.onclick=()=>{ selPOI(p.id); openPOIPopup(p); };
     layer.appendChild(orb);
     if(sortedByDist.indexOf(p)<3){
       const lbl=document.createElement('div');
@@ -1523,26 +1714,43 @@ function renderOrbs(){
   });
 }
 
-function borderPt(cx,cy,W,H,deg,pad){
+function borderPtPadded(cx,cy,W,H,deg,pad,bottomPad){
   const a=deg*Math.PI/180, dx=Math.sin(a), dy=-Math.cos(a);
-  const pw=W/2-pad, ph=H/2-pad;
+  const pw=W/2-pad;
+  const phTop=H/2-pad;
+  const phBot=H/2-pad-bottomPad; // più rientrato in basso
+  const ph=dy>0?phBot:phTop; // dy>0 = verso il basso
   const t=Math.abs(dx)<1e-9?ph/Math.abs(dy):Math.abs(dy)<1e-9?pw/Math.abs(dx):Math.min(pw/Math.abs(dx),ph/Math.abs(dy));
   return{x:cx+dx*t,y:cy+dy*t};
 }
 
+function borderPt(cx,cy,W,H,deg,pad){
+  return borderPtPadded(cx,cy,W,H,deg,pad,0);
+}
+
 // ━━━━━━━ MAP PINS ━━━━━━━
 function renderPins(onRoute){
-  Object.values(pLayers).forEach(l=>map.removeLayer(l));pLayers={};
+  Object.values(pMarkers).forEach(m=>m.setMap(null)); pMarkers={};
   vp().forEach(p=>{
-    const html=`<div class="mp2${p.id===selId?' sel':''}" id="pin-${p.id}">
-      <div class="mpb"><span>${p.emoji}</span></div><div class="mpd"></div></div>`;
-    const ic=L.divIcon({className:'',html,iconSize:[26,36],iconAnchor:[13,36]});
-    const m=L.marker([p.lat,p.lon],{icon:ic}).addTo(map);
-    m.on('click',()=>{
-  selPOI(p.id);
-  openPOIPopup(p);
-});
-    pLayers[p.id]=m;
+    const lat = parseFloat(p.lat);
+    const lng = parseFloat(p.lon ?? p.lng);
+    if(!isFinite(lat)||!isFinite(lng)) return;
+    const marker = new google.maps.Marker({
+      position:{lat, lng}, map,
+      icon:{
+        url: `data:image/svg+xml;charset=UTF-8,${encodeURIComponent(`
+          <svg xmlns="http://www.w3.org/2000/svg" width="26" height="36">
+            <circle cx="13" cy="13" r="12" fill="white" stroke="${p.id===selId?'#1d1d1f':'rgba(0,0,0,0.1)'}" stroke-width="${p.id===selId?'2':'1'}"/>
+            <text x="13" y="18" text-anchor="middle" font-size="14">${p.emoji}</text>
+            <circle cx="13" cy="34" r="2" fill="rgba(0,0,0,0.2)"/>
+          </svg>`)}`,
+        scaledSize: new google.maps.Size(26,36),
+        anchor: new google.maps.Point(13,36)
+      },
+      zIndex: p.id===selId ? 999 : 1
+    });
+    marker.addListener('click',()=>{ selPOI(p.id); openPOIPopup(p); });
+    pMarkers[p.id]=marker;
   });
 }
 
@@ -1606,16 +1814,32 @@ function renderTLEntries(){
                    data-id="${eid}"
                    data-text="${encodeURIComponent(e.text)}">
                    Leggi tutto ↓
-           </button>
-           <div id="after-${eid}"></div>`
+           </button>`
         : `<div class="tl-txt">${e.text}</div>`;
     } else {
       bodyHtml='';
     }
     const wikiBadge = e.wikiUsed ? `<span class="wiki-badge">📖 Wikipedia</span>` : '';
-    const badge = e.isOllama&&!e.loading
-      ? `<div class="ollama-badge">${wikiBadge}🤖 llama3.2 · ${e.time}</div>` : '';
+    const badge = e.isOllama && !e.loading
+      ? `<div class="ollama-badge">${wikiBadge}🤖 llama3.2</div>`
+      : '';
+    const hasImg = !!(e.imageUrl && !e.loading);
     const eid2 = e.id || ('e'+i);
+
+    // Riga 3: immagine float destra, testo la avvolge
+    const captionHtml = (hasImg && e.imageCaption)
+      ? `<div class="tl-img-caption">${e.imageCaption}</div>`
+      : '';
+    const contentRow = hasImg
+      ? `<div class="tl-content-row">
+           <figure class="tl-img-figure">
+             <img class="tl-wiki-img" src="${e.imageUrl}" alt="" loading="lazy"/>
+             ${captionHtml}
+           </figure>
+           ${bodyHtml}
+         </div>`
+      : `<div class="tl-content-row">${bodyHtml}</div>`;
+
     return`<div class="tl-e" style="animation-delay:${delay}s">
       <div class="tl-l">
         <div class="tl-ic${e.type==='cur'?' cur':e.type==='fut'?' fut':''}">
@@ -1626,7 +1850,8 @@ function renderTLEntries(){
       <div class="tl-b">
         <div class="tl-t">${e.time||nt()}</div>
         <div class="tl-title" id="tl-title-${eid2}">${e.title}</div>
-        ${bodyHtml}
+        ${contentRow}
+        <div id="after-${eid2}"></div>
         ${e.dist&&!e.loading?`<div class="tl-dist">${e.dir} · ${fmt(e.dist)}</div>`:''}
         ${badge}
       </div></div>`;
@@ -1651,7 +1876,6 @@ function expandTL(eid, encodedText){
   txtEl.classList.remove('tl-preview');
   btnEl.style.display = 'none';
 
-  // Aggiunge domande e "chiedi di più" dopo il testo
   const after = document.getElementById('after-'+eid);
   if(!after || document.getElementById('q-'+eid)) return;
   const questions = generateQuestions(fullText);
@@ -1662,26 +1886,30 @@ function expandTL(eid, encodedText){
           <span class="tl-q-ico">💬</span><span>${q}</span>
         </div>`).join('')}
     </div>
-    <div class="tl-q-row">
-      <span style="font-size:10px;color:var(--ink3)">Vuoi saperne di più?</span>
+    <div class="tl-ask-row">
+      <input class="tl-ask-input" id="ask-input-${eid}"
+        placeholder="Scrivi una domanda…"
+        onkeydown="if(event.key==='Enter') sendCustomAsk('${eid}')"/>
       <button class="tl-ask-more" id="askmore-${eid}" data-eid="${eid}">✦ Chiedi di più</button>
     </div>`;
 }
 
 function generateQuestions(text){
-  // Extract key nouns/topics from text to form questions
   const qs = [];
-  if(/\d{3,4}/.test(text)) qs.push('Cosa succedeva qui in quell\'epoca?');
-  if(/chiesa|basilica|duomo|cattedrale/i.test(text)) qs.push('Quando è stata costruita?');
-  if(/palazzo|villa|edificio|architettura/i.test(text)) qs.push('Chi ci abitava?');
-  if(/mercato|commercio|bottega|negozi/i.test(text)) qs.push('Come si viveva qui un tempo?');
-  if(/guerra|battaglia|conflitto|assedio/i.test(text)) qs.push('Quali eventi storici sono accaduti qui?');
+  if(/\d{3,4}/.test(text))                              qs.push('Cosa succedeva qui in quell\'epoca?');
+  if(/chiesa|basilica|duomo|cattedrale/i.test(text))     qs.push('Quando è stata costruita?');
+  if(/palazzo|villa|edificio|architettura/i.test(text))  qs.push('Chi ci abitava?');
+  if(/mercato|commercio|bottega|negozi/i.test(text))     qs.push('Come si viveva qui un tempo?');
+  if(/guerra|battaglia|conflitto|assedio/i.test(text))   qs.push('Quali eventi storici sono accaduti qui?');
   if(/artista|pittore|scultore|poeta|scrittore/i.test(text)) qs.push('Quali altre opere ha lasciato?');
-  if(/fontana|monumento|statua/i.test(text)) qs.push('Chi ha realizzato quest\'opera?');
-  // Always add fallback questions
-  if(qs.length < 2) qs.push('Cosa rende questo posto unico?');
-  if(qs.length < 2) qs.push('Cosa posso visitare nelle vicinanze?');
-  return qs.slice(0,3);
+  if(/fontana|monumento|statua/i.test(text))             qs.push('Chi ha realizzato quest\'opera?');
+  if(/cardinale|vescovo|papa|santo|beato/i.test(text))   qs.push('Qual è il suo lascito spirituale?');
+  if(/nato|nacque|morì|morto|vissuto/i.test(text))       qs.push('Dove è sepolto?');
+  // Fallback fino a 4 domande
+  const fallback = ['Cosa rende questo posto unico?','Cosa posso visitare nelle vicinanze?',
+                    'Ci sono leggende su questo luogo?','Come è cambiato nel tempo?'];
+  for(const f of fallback){ if(qs.length>=4) break; if(!qs.includes(f)) qs.push(f); }
+  return qs.slice(0,4);
 }
 
 /* CLICK HANDLER per domande e "chiedi di più" */
@@ -1691,15 +1919,32 @@ document.addEventListener('click', function(e){
     const eid = qEl.dataset.eid;
     const q = decodeURIComponent(qEl.dataset.q);
     const street = document.getElementById('tl-title-'+eid)?.textContent || lastStreetName;
+    // Evidenzia domanda selezionata
+    qEl.closest('.tl-questions')?.querySelectorAll('.tl-q').forEach(el=>el.classList.remove('selected'));
+    qEl.classList.add('selected');
     fetchDeepDive(eid, q, street);
     return;
   }
   const moreEl = e.target.closest('.tl-ask-more');
   if(moreEl){
     const eid = moreEl.dataset.eid;
-    askMore(eid, moreEl);
+    sendCustomAsk(eid);
   }
 });
+
+function sendCustomAsk(eid){
+  const input = document.getElementById('ask-input-'+eid);
+  const btn = document.getElementById('askmore-'+eid);
+  const q = input?.value?.trim();
+  const street = document.getElementById('tl-title-'+eid)?.textContent || lastStreetName;
+  if(!q){
+    // Senza testo: approfondimento generico
+    askMore(eid, btn);
+    return;
+  }
+  input.value = '';
+  fetchDeepDive(eid, q, street, null, btn);
+}
 
 async function askMore(eid, encodedText){
   const btn = document.getElementById('askmore-'+eid);
@@ -1719,16 +1964,21 @@ Rispondi in italiano, in modo preciso e coinvolgente (max 60 parole): ${question
   if(btn){ btn.classList.add('loading'); btn.textContent='⏳ Caricando…'; }
 
   try{
-    const res = await fetch(`${ollamaBaseUrl()}/api/generate`,{
-      method:'POST', headers:OLLAMA_HDR,
-      body:JSON.stringify({model:'llama3.2',prompt,stream:false,options:{temperature:0.8,num_predict:120}}),
+    const res = await fetch(N8N_URL, {
+      method:'POST',
+      headers:{'Content-Type':'application/json','Accept':'application/json'},
+      body:JSON.stringify({
+        street: street,
+        city: currentCity,
+        country: currentCountry,
+        question: question || null
+      }),
       signal:AbortSignal.timeout(60000)
     });
     if(!res.ok) throw new Error('HTTP '+res.status);
     const data = await res.json();
-    const text = data.response?.trim();
+    const text = data.text?.trim() || data.response?.trim();
     if(text){
-      // Push a new timeline card with the answer
       pushTL({type:'cur',emoji:'💬',title:question||'Approfondimento',text,isOllama:true});
     }
   }catch(e){
@@ -1753,68 +2003,116 @@ function toggleSettings(){
 
 function centerMap(){
   if(!map || !uPos) return;
-  map.invalidateSize({animate:false, pan:false});
-  map.setView([uPos.lat, uPos.lng], map.getZoom(), {animate:false});
+  map.panTo({lat:uPos.lat, lng:uPos.lng});
 }
 
-// ── GRAB HANDLE — resize map-row height ──
+// ── GRAB HANDLE — 3 snap points ──
 (function(){
-  const grab = document.getElementById('tl-grab');
-  const mapRow = document.getElementById('map-row');
+  const grab    = document.getElementById('tl-grab');
+  const mapRow  = document.getElementById('map-row');
+  const tlScroll= document.getElementById('tl-scroll');
   if(!grab || !mapRow) return;
 
-  const DEFAULT_H = window.innerHeight * 0.48;
-  const MIN_H = window.innerHeight * 0.15;
-  const MAX_H = window.innerHeight * 0.72;
+  const VH = window.innerHeight;
+  // 3 posizioni di ancoraggio
+  const SNAP = {
+    MAP:      Math.round(VH * 0.72), // mappa grande, solo "Sei in"
+    DEFAULT:  Math.round(VH * 0.48), // posizione normale
+    CONTENT:  Math.round(VH * 0.22), // mappa piccola, contenuto espanso
+  };
+  const SNAPS = [SNAP.CONTENT, SNAP.DEFAULT, SNAP.MAP];
 
-  mapRow.style.height = DEFAULT_H + 'px';
+  let currentSnap = SNAP.DEFAULT;
+  mapRow.style.height = currentSnap + 'px';
 
-  let startY = 0, startH = 0, dragging = false;
-  let lastCenterY = 0; // traccia ogni quanti px ricalcoliamo il centro
+  function applySnap(target, animate=true){
+    currentSnap = target;
+    mapRow.style.transition = animate ? 'height .35s cubic-bezier(.4,0,.2,1)' : 'none';
+    mapRow.style.height = target + 'px';
+    const tlSection = document.getElementById('tl-section');
+    const mapZone   = document.getElementById('map-zone');
 
-  function scaleTL(mapH){
-    const ratio = Math.max(0, Math.min(1, 1 - (mapH - MIN_H) / (DEFAULT_H - MIN_H)));
+    if(target >= SNAP.MAP){
+      tlSection.classList.add('map-mode');
+      document.documentElement.style.setProperty('--tl-title-size', '15px');
+      document.documentElement.style.setProperty('--tl-txt-size', '12px');
+    } else {
+      tlSection.classList.remove('map-mode');
+      _applyNextCardVisibility();
+      const ratio = Math.max(0, Math.min(1, (SNAP.DEFAULT - target) / (SNAP.DEFAULT - SNAP.CONTENT)));
+      document.documentElement.style.setProperty('--tl-title-size', (15 + ratio * 4) + 'px');
+      document.documentElement.style.setProperty('--tl-txt-size',   (12 + ratio * 3) + 'px');
+    }
+
+    if(target >= SNAP.MAP || target <= SNAP.CONTENT){
+      mapZone.classList.add('expanded');
+    } else {
+      mapZone.classList.remove('expanded');
+    }
+
+    setTimeout(()=>{ centerMap(); mapRow.style.transition = ''; }, animate ? 360 : 0);
+  }
+
+  function nearestSnap(h){
+    return SNAPS.reduce((a,b)=> Math.abs(b-h) < Math.abs(a-h) ? b : a);
+  }
+
+  let startY=0, startH=0, dragging=false, lastCenterY=0;
+
+  function onStart(clientY){
+    dragging=true; startY=clientY; lastCenterY=clientY;
+    startH=mapRow.offsetHeight;
+    grab.classList.add('dragging');
+    document.body.style.userSelect='none';
+    mapRow.style.transition='none';
+  }
+  function onMove(clientY){
+    if(!dragging) return;
+    const newH = Math.min(SNAP.MAP + 20, Math.max(SNAP.CONTENT - 20, startH + (clientY - startY)));
+    mapRow.style.height = newH + 'px';
+    if(Math.abs(clientY - lastCenterY) >= 5){ lastCenterY=clientY; centerMap(); }
+
+    const mapZone  = document.getElementById('map-zone');
+    const tlSection= document.getElementById('tl-section');
+
+    const nearExpanded = newH >= SNAP.DEFAULT + (SNAP.MAP - SNAP.DEFAULT) * 0.4
+                      || newH <= SNAP.DEFAULT - (SNAP.DEFAULT - SNAP.CONTENT) * 0.4;
+    mapZone.classList.toggle('expanded', nearExpanded);
+
+    const nearMap = newH >= SNAP.DEFAULT + (SNAP.MAP - SNAP.DEFAULT) * 0.6;
+    tlSection.classList.toggle('map-mode', nearMap);
+    if(!nearMap) _applyNextCardVisibility();
+
+    const ratio = Math.max(0, Math.min(1, (SNAP.DEFAULT - newH) / (SNAP.DEFAULT - SNAP.CONTENT)));
     document.documentElement.style.setProperty('--tl-title-size', (15 + ratio * 4) + 'px');
     document.documentElement.style.setProperty('--tl-txt-size',   (12 + ratio * 3) + 'px');
   }
-
-  function onStart(clientY){
-    dragging = true;
-    startY = clientY;
-    lastCenterY = clientY;
-    startH = mapRow.offsetHeight;
-    grab.classList.add('dragging');
-    document.body.style.userSelect = 'none';
-  }
-
-  function onMove(clientY){
+  function onEnd(clientY){
     if(!dragging) return;
-    const newH = Math.min(MAX_H, Math.max(MIN_H, startH + (clientY - startY)));
-    mapRow.style.height = newH + 'px';
-    mapRow.style.transition = 'none';
-    scaleTL(newH);
-    // Ogni 5px di movimento ricalcola il centro esatto rispetto al nuovo div
-    if(Math.abs(clientY - lastCenterY) >= 5){
-      lastCenterY = clientY;
-      centerMap();
-    }
-  }
-
-  function onEnd(){
-    if(!dragging) return;
-    dragging = false;
+    dragging=false;
     grab.classList.remove('dragging');
-    document.body.style.userSelect = '';
-    mapRow.style.transition = '';
-    centerMap(); // centra una volta finale precisa
+    document.body.style.userSelect='';
+    const curH = parseInt(mapRow.style.height)||SNAP.DEFAULT;
+    applySnap(nearestSnap(curH));
   }
 
   grab.addEventListener('touchstart', e=>onStart(e.touches[0].clientY), {passive:true});
-  document.addEventListener('touchmove', e=>{if(dragging){e.preventDefault();onMove(e.touches[0].clientY);}},{passive:false});
-  document.addEventListener('touchend', onEnd, {passive:true});
+  document.addEventListener('touchmove', e=>{ if(dragging){e.preventDefault();onMove(e.touches[0].clientY);}},{passive:false});
+  document.addEventListener('touchend',  e=>onEnd(e.changedTouches[0].clientY), {passive:true});
   grab.addEventListener('mousedown', e=>onStart(e.clientY));
-  document.addEventListener('mousemove', e=>{if(dragging) onMove(e.clientY);});
-  document.addEventListener('mouseup', onEnd);
+  document.addEventListener('mousemove', e=>{ if(dragging) onMove(e.clientY); });
+  document.addEventListener('mouseup',   e=>onEnd(e.clientY));
+
+  // Doppio tap sul grab per ciclare tra gli snap
+  let lastTap = 0;
+  grab.addEventListener('touchend', ()=>{
+    const now = Date.now();
+    if(now - lastTap < 300){
+      const idx = SNAPS.indexOf(currentSnap);
+      applySnap(SNAPS[(idx + 1) % SNAPS.length]);
+    }
+    lastTap = now;
+  }, {passive:true});
 })();
 let nextCardVisible = false; // nascosta di default
 
@@ -1855,12 +2153,37 @@ function setupSwipe(){}
 
 
 // ━━━━━━━ SELECT ━━━━━━━
+function _fitUserAndPOI(id){
+  if(!map||!uPos) return;
+  const p = places.find(x=>x.id===id);
+  if(!p) return;
+  const lat = parseFloat(p.lat);
+  const lng = parseFloat(p.lon ?? p.lng);
+  if(!isFinite(lat)||!isFinite(lng)) return;
+  const bounds = new google.maps.LatLngBounds();
+  bounds.extend({lat:uPos.lat, lng:uPos.lng});
+  bounds.extend({lat, lng});
+  map.fitBounds(bounds, {top:80, right:60, bottom:80, left:60});
+}
+
 function selPOI(id){
-  selId=id;renderOrbs();
-  document.querySelectorAll('.mp2').forEach(e=>e.classList.remove('sel'));
-  document.querySelector(`#pin-${id}`)?.classList.add('sel');
+  selId=id; renderOrbs(); renderPins([]);
   const p=places.find(x=>x.id===id);
-  if(p&&map)map.panTo([p.lat,p.lon],{animate:true,duration:.5});
+  if(!p||!map) return;
+  const lat = parseFloat(p.lat);
+  const lng = parseFloat(p.lon ?? p.lng);
+  if(!isFinite(lat)||!isFinite(lng)) return;
+
+  // Salva POI selezionato — la mappa mostra utente + POI
+  _poiSelectedId = id;
+  _fitUserAndPOI(id);
+
+  // Dopo 8s senza interazione, torna a seguire l'utente
+  if(_poiReturnTimer) clearTimeout(_poiReturnTimer);
+  _poiReturnTimer = setTimeout(()=>{
+    _poiSelectedId = null;
+    if(uPos&&map) map.panTo({lat:uPos.lat, lng:uPos.lng});
+  }, 8000);
 }
 
 // ━━━━━━━ MODE ━━━━━━━
@@ -1881,16 +2204,12 @@ document.getElementById('si').addEventListener('input',e=>{
 document.getElementById('si').addEventListener('keydown',e=>{
   if(e.key==='Enter'){const v=e.target.value.trim();if(v)geocode(v,true);}});
 async function geocode(q,imm=false){
-  const dm=[{name:'Colosseo',lat:41.8902,lng:12.4922},{name:'Vaticano',lat:41.9022,lng:12.4539},
-    {name:'Trastevere',lat:41.8895,lng:12.4697},{name:'Piazza di Spagna',lat:41.9058,lng:12.4823},
-    {name:'Termini',lat:41.9009,lng:12.5005},{name:'Testaccio',lat:41.8776,lng:12.4772}];
-  const mt=dm.filter(d=>d.name.toLowerCase().includes(q.toLowerCase()));
-  if(mt.length){if(imm&&mt.length===1){startNav(mt[0]);return;}showSug(mt);return;}
   try{
-    const r=await fetch(`https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(q)}&format=json&limit=4&countrycodes=it`,{headers:{'Accept-Language':'it'}});
+    const r=await fetch(`https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(q)}&format=json&limit=4`,{headers:{'Accept-Language':'it'}});
     const d=await r.json();
     const res=d.map(x=>({name:x.display_name.split(',')[0],sub:x.display_name.split(',').slice(1,3).join(',').trim(),lat:parseFloat(x.lat),lng:parseFloat(x.lon)}));
-    if(imm&&res.length===1){startNav(res[0]);hideSug();return;}showSug(res);
+    if(imm&&res.length===1){startNav(res[0]);hideSug();return;}
+    showSug(res);
   }catch{hideSug();}
 }
 function showSug(l){
@@ -1901,30 +2220,52 @@ function showSug(l){
 function hideSug(){document.getElementById('sugg').style.display='none';}
 function clearSrch(){document.getElementById('si').value='';hideSug();}
 function onMapClick(e){
-
-closePOIPopup();
-if(mode!=='navigate')return;startNav({name:'Punto sulla mappa',lat:e.latlng.lat,lng:e.latlng.lng});}
+  closePOIPopup();
+  if(mode!=='navigate') return;
+  startNav({name:'Punto sulla mappa', lat:e.latLng.lat(), lng:e.latLng.lng()});
+}
 
 // ━━━━━━━ NAVIGATION ━━━━━━━
 async function startNav(dest){
   hideSug();clearSrch();
   document.getElementById('route-bar').style.display='block';
   document.getElementById('rb-dn').textContent=dest.name;
-  if(dMark)map.removeLayer(dMark);
-  const di=L.divIcon({className:'',html:`<div class="dest-pin"><div class="dest-flag">🏁</div><div class="dest-d"></div></div>`,iconSize:[24,32],iconAnchor:[12,32]});
-  dMark=L.marker([dest.lat,dest.lng],{icon:di,zIndexOffset:500}).addTo(map);
-  let coords;if(ORS_KEY)coords=await fetchORS(uPos.lat,uPos.lng,dest.lat,dest.lng);
-  if(!coords)coords=simRoute(uPos.lat,uPos.lng,dest.lat,dest.lng);
-  if(rLayer)map.removeLayer(rLayer);
-  rLayer=L.polyline(coords,{color:'#007AFF',weight:4,opacity:.6,lineCap:'round',lineJoin:'round'}).addTo(map);
-  map.fitBounds(rLayer.getBounds(),{padding:[60,60]});
+  if(dMarker) dMarker.setMap(null);
+  dMarker = new google.maps.Marker({
+    position:{lat:dest.lat,lng:dest.lng}, map,
+    icon:{
+      url:`data:image/svg+xml;charset=UTF-8,${encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" width="24" height="32"><rect x="2" y="2" width="20" height="20" rx="4" fill="#1d1d1f"/><text x="12" y="17" text-anchor="middle" font-size="13">🏁</text><circle cx="12" cy="30" r="2" fill="rgba(0,0,0,0.3)"/></svg>')}`,
+      scaledSize: new google.maps.Size(24,32),
+      anchor: new google.maps.Point(12,32)
+    }, zIndex:500
+  });
+  // Google Maps Directions API — percorso pedonale reale
+  let coords;
+  try {
+    coords = await fetchGoogleRoute(uPos.lat, uPos.lng, dest.lat, dest.lng);
+  } catch(e) {
+    coords = null;
+  }
+  if(!coords || coords.length < 2) {
+    coords = simRoute(uPos.lat, uPos.lng, dest.lat, dest.lng);
+  }
+
+  if(rPolyline) rPolyline.setMap(null);
+  rPolyline = new google.maps.Polyline({
+    path: coords.map(c=>({lat:c[0],lng:c[1]})),
+    strokeColor:'#007AFF', strokeOpacity:.8, strokeWeight:5,
+    map
+  });
+  const bounds = new google.maps.LatLngBounds();
+  coords.forEach(c=>bounds.extend({lat:c[0],lng:c[1]}));
+  map.fitBounds(bounds, {top:80,right:40,bottom:80,left:40});
   const along=findAlong(coords);
-  const td=rLen(coords),tm=Math.round(td/80);
+  const td=rLen(coords), tm=Math.round(td/80);
   document.getElementById('rb-dist').textContent=fmt(td);
   document.getElementById('rb-time').textContent=tm<60?`${tm} min`:`${Math.floor(tm/60)}h ${tm%60}m`;
   document.getElementById('rb-poi').textContent=along.length;
   rData={dest,coords,pois:along,td};
-  renderPins(along.map(p=>p.id));buildTLnav(along);startNavSim(td);
+  renderPins(along.map(p=>p.id)); buildTLnav(along); startNavSim(td);
 }
 function buildTLnav(along){
   tlEntries=[{type:'cur',emoji:'📍',time:nt(),title:'Inizio percorso',text:'Stai per partire. Le tappe ti aspettano lungo il percorso.'}];
@@ -1933,9 +2274,22 @@ function buildTLnav(along){
     title:p.name,text:p.text,dist:p._rd,dir:'→'}));
   renderTLEntries();
 }
-async function fetchORS(a,b,c,d){
-  try{const r=await fetch(`https://api.openrouteservice.org/v2/directions/foot-walking?api_key=${ORS_KEY}&start=${b},${a}&end=${d},${c}`);
-    const j=await r.json();return j.features[0].geometry.coordinates.map(x=>[x[1],x[0]]);}catch{return null;}
+// Google Maps Directions API — percorso pedonale reale
+async function fetchGoogleRoute(fromLat, fromLng, toLat, toLng){
+  return new Promise((resolve, reject)=>{
+    const service = new google.maps.DirectionsService();
+    service.route({
+      origin: {lat: fromLat, lng: fromLng},
+      destination: {lat: toLat, lng: toLng},
+      travelMode: google.maps.TravelMode.WALKING
+    }, (result, status)=>{
+      if(status !== 'OK'){ reject(new Error(status)); return; }
+      // Decodifica i punti dell'itinerario
+      const path = result.routes[0].overview_path;
+      const coords = path.map(p=>[p.lat(), p.lng()]);
+      resolve(coords);
+    });
+  });
 }
 function simRoute(la,lo,la2,lo2){
   const n=30,c=[];
@@ -1966,161 +2320,40 @@ function updateNav(){
 }
 function cancelRoute(silent){
   if(simNavI)clearInterval(simNavI);rData=null;simNavP=0;
-  if(rLayer){map.removeLayer(rLayer);rLayer=null;}
-  if(dMark){map.removeLayer(dMark);dMark=null;}
+  if(rPolyline){rPolyline.setMap(null);rPolyline=null;}
+  if(dMarker){dMarker.setMap(null);dMarker=null;}
   document.getElementById('rb-fill').style.width='0%';
   document.getElementById('route-bar').style.display='none';
   buildTL();if(!silent)setMode('explore');
 }
 
-// ━━━━━━━ OLLAMA ━━━━━━━
 
-// ollamaIP can be either:
-//   "192.168.1.45"            → local WiFi  → http://192.168.1.45:11434
-//   "https://xxxx.trycloudflare.com" → tunnel → use as-is
-function ollamaBaseUrl(){
-  if(!ollamaIP) return '';
-  // If it already looks like a full URL, use it directly
-  if(ollamaIP.startsWith('http://') || ollamaIP.startsWith('https://')){
-    return ollamaIP.replace(/\/+$/,''); // strip trailing slash
-  }
-  // Otherwise treat as bare IP
-  return `http://${ollamaIP}:11434`;
-}
+// ━━━━━━━ N8N AGENT ━━━━━━━
+const N8N_URL = 'https://domonique-procompensation-elvin.ngrok-free.dev/webhook/locus-narrate';
 
-// Tab switching in modal
-let ollamaTab = localStorage.getItem('ollama_tab') || 'local';
-function switchOllamaTab(tab){
-  ollamaTab = tab;
-  localStorage.setItem('ollama_tab', tab);
-  document.getElementById('tab-local').className  = 'os-tab' + (tab==='local'?' active':'');
-  document.getElementById('tab-tunnel').className = 'os-tab' + (tab==='tunnel'?' active':'');
-  document.getElementById('os-panel-local').style.display  = tab==='local'  ? '' : 'none';
-  document.getElementById('os-panel-tunnel').style.display = tab==='tunnel' ? '' : 'none';
-}
-
-function updateOllamaPill(){
-  const pill=document.getElementById('ollama-pill');
-  if(!pill)return;
-  if(ollamaEnabled&&ollamaIP){
-    pill.textContent='🤖 AI attiva';
-    pill.className='ollama-pill on';
-  } else {
-    pill.textContent='🤖 Connetti AI';
-    pill.className='ollama-pill';
-  }
-}
-
-function openOllamaModal(){
-  // Restore last saved values into correct fields
-  const savedIP = localStorage.getItem('ollama_ip')||'';
-  const savedTab = localStorage.getItem('ollama_tab')||'local';
-  switchOllamaTab(savedTab);
-  if(savedTab==='local'){
-    document.getElementById('ollama-local-input').value = savedIP;
-  } else {
-    document.getElementById('ollama-tunnel-input').value = savedIP;
-  }
-  document.getElementById('ollama-modal').classList.add('vis');
-}
-function closeOllamaModal(){
-  document.getElementById('ollama-modal').classList.remove('vis');
-}
-
-async function saveOllamaConfig(){
-  const isTunnel = ollamaTab === 'tunnel';
-  const val = isTunnel
-    ? document.getElementById('ollama-tunnel-input').value.trim()
-    : document.getElementById('ollama-local-input').value.trim();
-
-  if(!val){ showOllamaToast('⚠️ Inserisci un indirizzo'); return; }
-
-  // Validate: tunnel must start with https://
-  if(isTunnel && !val.startsWith('http')){
-    showOllamaToast('⚠️ Incolla l\'URL completo con https://');
-    return;
-  }
-
-  ollamaIP = val;
-  localStorage.setItem('ollama_ip', val);
-  localStorage.setItem('ollama_tab', ollamaTab);
-  ollamaEnabled = true;
-  updateOllamaPill();
-
-  // Show testing state
-  const btn = document.querySelector('.os-save');
-  btn.textContent = 'Connessione in corso…';
-  btn.disabled = true;
-
-  const ok = await testOllama();
-  btn.textContent = 'Connetti e testa';
-  btn.disabled = false;
-
-  if(ok){
-    closeOllamaModal();
-    showOllamaToast('✓ Ollama connesso — carico modello in GPU…');
-    warmupOllama().then(()=>{
-      showOllamaToast('✓ llama3.2 pronto');
-      startOllamaInterval();
-      if(lastStreetName) triggerOllamaForStreet(lastStreetName);
-    });
-  } else {
-    const hint = isTunnel
-      ? 'Controlla che il tunnel sia avviato e l\'URL sia aggiornato'
-      : 'Controlla IP, stessa WiFi, e che Ollama sia avviato con OLLAMA_ORIGINS=*';
-    showOllamaToast(`✗ Connessione fallita — ${hint}`);
-  }
-}
-
-async function testOllama(){
+async function callN8NAgent(streetName){
+  if(ollamaLoading) return null;
+  ollamaLoading = true;
+  dbg(`→ n8n: "${streetName}"`, 'req');
   try{
-    const r=await fetch(`${ollamaBaseUrl()}/api/tags`,{headers:OLLAMA_HDR,signal:AbortSignal.timeout(6000)});
-    return r.ok;
-  }catch{return false;}
-}
-
-// Build the prompt for a street name
-// Fetch Wikipedia summary — best-effort, max 4s, never blocks Ollama
-async function fetchWikiContext(streetName, city, country){
-  const queries = [];
-  if(city) queries.push(`${streetName} ${city}`);
-  queries.push(streetName);
-
-  for(const q of queries){
-    try{
-      const lang = (country||'').toLowerCase().includes('ital') ? 'it' : 'en';
-      const url = `https://${lang}.wikipedia.org/api/rest_v1/page/summary/${encodeURIComponent(q)}`;
-      dbg(`Wiki → ${q}`, 'req');
-      const r = await fetch(url, {signal: AbortSignal.timeout(4000)});
-      if(!r.ok || r.status===204){ dbg(`Wiki skip: HTTP ${r.status}`,'info'); continue; }
-      const txt = await r.text();
-      if(!txt||txt.trim().length<10){ dbg('Wiki skip: vuoto','info'); continue; }
-      let d; try{ d=JSON.parse(txt); }catch{ dbg('Wiki skip: JSON invalido','info'); continue; }
-      if(d.extract && d.extract.length>80){
-        const snippet=d.extract.slice(0,500);
-        dbg(`✓ Wiki ${snippet.length} chars`,'ok');
-        return snippet;
-      }
-    }catch(e){
-      dbg(`Wiki skip: ${e.message}`,'info');
+    const res = await fetch(N8N_URL, {
+      method:'POST',
+      headers:{'Content-Type':'application/json','Accept':'application/json'},
+      body:JSON.stringify({street:streetName, city:currentCity, country:currentCountry}),
+      signal:AbortSignal.timeout(60000)
+    });
+    if(!res.ok){ dbg(`✗ HTTP ${res.status}`,'err'); return null; }
+    const data = await res.json();
+    if(data.success && data.text){
+      dbg(`✓ ${data.text.length} chars | src:${data.sourceUsed||'?'}`,'ok');
+      return data;
     }
-  }
-  dbg('Wiki: nessun risultato, Ollama senza contesto','info');
-  return null;
-}
-
-function buildStreetPrompt(streetName, quarter, wikiContext){
-  const location = [streetName, quarter, currentCity, currentCountry].filter(Boolean).join(', ');
-  const wikiBlock = wikiContext
-    ? `\n\nInformazioni verificate da Wikipedia:\n"${wikiContext}"\n\nUsa queste informazioni come base — sii fedele ai fatti, ma racconta con calore e curiosità.`
-    : '\n\nSe non hai informazioni specifiche, descrivi l\'atmosfera tipica del luogo con un dettaglio autentico.';
-
-  return `Sei una guida locale esperta. Un viaggiatore sta camminando lungo "${location}".
-
-Scrivi UN paragrafo di massimo 60 parole in italiano.
-Racconta qualcosa di specifico: storia, architettura, vita quotidiana, aneddoto, personaggio famoso, o dettaglio inaspettato.
-Tono personale e caldo — come un amico che conosce bene il posto.
-Solo prosa fluida — niente elenchi, niente saluti, niente titoli. Inizia direttamente con il contenuto.${wikiBlock}`;
+    dbg(`✗ ${data.error||'risposta vuota'}`,'err');
+    return null;
+  }catch(e){
+    dbg(`✗ ${e.name==='TimeoutError'?'timeout 60s':e.message}`,'err');
+    return null;
+  }finally{ ollamaLoading=false; }
 }
 
 function toggleDbg(){
@@ -2133,53 +2366,26 @@ function toggleDbg(){
 }
 function updateDbgUrl(){
   const el=document.getElementById('ollama-dbg-url');
-  if(!el)return;
-  el.textContent=`URL attivo: ${ollamaBaseUrl()}/api/generate`;
+  if(el) el.textContent=`n8n: ${N8N_URL}`;
 }
 function applyDbgUrl(){
   const val=document.getElementById('dbg-url-input')?.value?.trim();
   if(!val){dbg('Inserisci un URL','err');return;}
-  ollamaIP=val;
-  dbg(`✓ URL aggiornato → ${ollamaBaseUrl()}`,'ok');
-  updateDbgUrl();
-  // Force re-trigger on current street
+  window._n8nUrl=val;
+  dbg(`URL → ${val}`,'ok');
   lastOllamaStreet='';
-  warmupOllama().then(()=>{
-    if(lastStreetName){
-      const q=document.getElementById('sb-acc')?.textContent||'';
-      triggerOllamaForStreet(lastStreetName,q);
-    }
-  });
+  if(lastStreetName) triggerOllamaForStreet(lastStreetName);
 }
 async function testOllamaManual(){
   updateDbgUrl();
-  if(!ollamaIP){ dbg('Nessun IP configurato','err'); return; }
-  dbg(`Test connessione → ${ollamaBaseUrl()}/api/tags`,'req');
+  dbg(`Test → ${N8N_URL}`,'req');
   try{
-    const r=await fetch(`${ollamaBaseUrl()}/api/tags`,{headers:OLLAMA_HDR,signal:AbortSignal.timeout(6000)});
-    if(r.ok){
-      const d=await r.json();
-      const models=(d.models||[]).map(m=>m.name).join(', ')||'nessuno';
-      dbg(`✓ Ollama risponde — modelli: ${models}`,'ok');
-      // Try a mini generate to confirm llama3.2
-      dbg('Test generate llama3.2…','req');
-      lastOllamaStreet=''; // force re-trigger
-      if(lastStreetName) triggerOllamaForStreet(lastStreetName);
-      else {
-        dbg('GPS non ancora pronto — attendi posizione','info');
-      }
-    } else {
-      dbg(`✗ HTTP ${r.status}`,'err');
-    }
-  }catch(e){
-    const hint=e.name==='TypeError'
-      ?`Impossibile raggiungere ${ollamaBaseUrl()} — controlla:\n  1. OLLAMA_HOST=0.0.0.0\n  2. OLLAMA_ORIGINS=*\n  3. Stessa WiFi`
-      :e.message;
-    dbg(`✗ ${hint}`,'err');
-  }
+    const res=await fetch(N8N_URL,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({street:'Test',city:'Milano',country:'Italia'}),signal:AbortSignal.timeout(12000)});
+    if(res.ok){const d=await res.json();dbg(`✓ ok — success:${d.success}`,'ok');if(d.text)dbg(`"${d.text.slice(0,60)}…"`,'ok');}
+    else dbg(`✗ HTTP ${res.status}`,'err');
+  }catch(e){dbg(`✗ ${e.message}`,'err');}
 }
 
-// ── DEBUG LOG (visible in-app) ──
 function dbg(msg, type='info'){
   const el=document.getElementById('ollama-dbg-log');
   if(!el)return;
@@ -2189,81 +2395,29 @@ function dbg(msg, type='info'){
   const line=document.createElement('div');
   line.style.cssText=`color:${colors[type]||colors.info};padding:2px 0;border-bottom:1px solid #f0f0f0;word-break:break-all`;
   line.textContent=`${ts} ${msg}`;
-  el.insertBefore(line, el.firstChild);
-  // Keep max 20 lines
+  el.insertBefore(line,el.firstChild);
   while(el.children.length>20) el.removeChild(el.lastChild);
-  // Also show in browser console
-  console.log(`[Ollama ${type}]`, msg);
+  console.log(`[n8n ${type}]`,msg);
 }
 
-// ━━━━━━━ N8N AGENT ━━━━━━━
-// n8n gira in locale — esposto via ngrok stesso tunnel di Ollama
-// URL del webhook n8n (stessa ngrok di Ollama, porta 5678 di n8n)
-const N8N_URL = 'https://domonique-procompensation-elvin.ngrok-free.dev/webhook/locus-narrate';
-
-async function callN8NAgent(streetName, quarter){
-  if(ollamaLoading) return null;
-  ollamaLoading = true;
-  dbg(`→ n8n: "${streetName}"`, 'req');
-  try{
-    const res = await fetch(N8N_URL, {
-      method: 'POST',
-      headers: {'Content-Type':'application/json','Accept':'application/json'},
-      body: JSON.stringify({
-        street: streetName,
-        city: currentCity,
-        country: currentCountry
-      }),
-      signal: AbortSignal.timeout(60000)
-    });
-    if(!res.ok){
-      dbg(`✗ n8n HTTP ${res.status}`, 'err');
-      return null;
-    }
-    const data = await res.json();
-    if(data.success && data.text){
-      dbg(`✓ ${data.text.length} chars | wiki:${data.wikiUsed} osm:${data.osmUsed}`, 'ok');
-      return data;
-    }
-    dbg(`✗ n8n: ${data.error||'risposta vuota'}`, 'err');
-    return null;
-  }catch(e){
-    const msg = e.name==='TimeoutError' ? 'timeout 60s' : e.message;
-    dbg(`✗ n8n: ${msg}`, 'err');
-    return null;
-  }finally{
-    ollamaLoading = false;
-  }
-}
+async function warmupOllama(){ dbg('n8n pronto','info'); }
 
 async function triggerOllamaForStreet(streetName, quarter=''){
-  if(!streetName || streetName===lastOllamaStreet) return;
-  lastOllamaStreet = streetName;
-  dbg(`trigger: "${streetName}"`, 'info');
-
-  const loadingId = 'ollama-'+Date.now();
-  pushTL({id:loadingId, type:'cur', emoji:'🤖', title:streetName, text:null, loading:true, isOllama:true});
-
-  const result = await callN8NAgent(streetName, quarter);
+  if(!streetName||streetName===lastOllamaStreet) return;
+  lastOllamaStreet=streetName;
+  dbg(`trigger: "${streetName}"`,'info');
+  const loadingId='ollama-'+Date.now();
+  pushTL({id:loadingId,type:'cur',emoji:'<svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24"><path fill="currentColor" d="m20.713 7.128l-.246.566a.506.506 0 0 1-.934 0l-.246-.566a4.36 4.36 0 0 0-2.22-2.25l-.759-.339a.53.53 0 0 1 0-.963l.717-.319A4.37 4.37 0 0 0 19.276.931L19.53.32a.506.506 0 0 1 .942 0l.253.61a4.37 4.37 0 0 0 2.25 2.327l.718.32a.53.53 0 0 1 0 .962l-.76.338a4.36 4.36 0 0 0-2.219 2.251M8.5 6h-2v12h2zM4 10H2v4h2zm9-8h-2v20h2zm4.5 6h-2v10h2zm4.5 2h-2v4h2z"/></svg>',title:streetName,text:null,loading:true,isOllama:true});
+  const result=await callN8NAgent(streetName);
   if(result){
-    tlEntries = tlEntries.map(e => e.id===loadingId
-      ? {...e, text:result.text, loading:false, wikiUsed:result.wikiUsed}
-      : e);
+    tlEntries=tlEntries.map(e=>e.id===loadingId?{...e,text:result.text,loading:false,wikiUsed:result.wikiUsed,imageUrl:result.imageUrl||'',imageCaption:result.imageCaption||''}:e);
     renderTLEntries();
   } else {
-    tlEntries = tlEntries.map(e => e.id===loadingId
-      ? {...e, text:'⚠️ Agente non raggiungibile — controlla n8n e ngrok', loading:false}
-      : e);
+    tlEntries=tlEntries.map(e=>e.id===loadingId?{...e,text:'⚠️ Agente non raggiungibile — controlla n8n e ngrok',loading:false}:e);
     renderTLEntries();
   }
 }
 
-// Warmup: n8n non ha bisogno di warmup, ma possiamo fare un ping
-async function warmupOllama(){
-  dbg('n8n agent pronto', 'info');
-}
-
-// Start 30-second interval — DISABLED, only street-change triggers now
 function startOllamaInterval(){ /* no-op */ }
 function stopOllamaInterval(){
   if(ollamaIntervalId)clearInterval(ollamaIntervalId);
