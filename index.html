@@ -2504,14 +2504,54 @@ async function triggerOllamaForStreet(streetName, quarter=''){
   dbg(`trigger: "${streetName}"`,'info');
   const loadingId='ollama-'+Date.now();
   pushTL({id:loadingId,type:'cur',emoji:'<svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24"><path fill="currentColor" d="m20.713 7.128l-.246.566a.506.506 0 0 1-.934 0l-.246-.566a4.36 4.36 0 0 0-2.22-2.25l-.759-.339a.53.53 0 0 1 0-.963l.717-.319A4.37 4.37 0 0 0 19.276.931L19.53.32a.506.506 0 0 1 .942 0l.253.61a4.37 4.37 0 0 0 2.25 2.327l.718.32a.53.53 0 0 1 0 .962l-.76.338a4.36 4.36 0 0 0-2.219 2.251M8.5 6h-2v12h2zM4 10H2v4h2zm9-8h-2v20h2zm4.5 6h-2v10h2zm4.5 2h-2v4h2z"/></svg>',title:streetName,text:null,loading:true,isOllama:true});
-  const result=await callN8NAgent(streetName);
-  if(result){
-    tlEntries=tlEntries.map(e=>e.id===loadingId?{...e,text:result.text,loading:false,wikiUsed:result.wikiUsed,imageUrl:result.imageUrl||'',imageCaption:result.imageCaption||'',streetId:result.streetId||''}:e);
+
+  const result = await callN8NAgent(streetName);
+
+  if(!result){
+    // n8n/ngrok non raggiungibile
+    tlEntries=tlEntries.map(e=>e.id===loadingId?{
+      ...e, loading:false, isOllama:true,
+      text:'⚠️ Agente non raggiungibile — controlla n8n e ngrok.'
+    }:e);
     renderTLEntries();
-  } else {
-    tlEntries=tlEntries.map(e=>e.id===loadingId?{...e,text:'⚠️ Agente non raggiungibile — controlla n8n e ngrok',loading:false}:e);
-    renderTLEntries();
+    return;
   }
+
+  if(result.noData){
+    // Nessuna info trovata — mostra invito a contribuire
+    tlEntries=tlEntries.map(e=>e.id===loadingId?{
+      ...e, loading:false, isOllama:true,
+      text: result.text,   // "Non ho trovato info... Vuoi contribuire?"
+      streetId: result.streetId||'',
+      wikiUsed:false, imageUrl:'', imageCaption:'',
+      _noData: true
+    }:e);
+    renderTLEntries();
+    return;
+  }
+
+  if(result._ollamaFailed){
+    // Info trovate ma Ollama non disponibile
+    tlEntries=tlEntries.map(e=>e.id===loadingId?{
+      ...e, loading:false, isOllama:true,
+      text: result.text,  // "Ho trovato info ma il modello AI non è raggiungibile..."
+      streetId: result.streetId||'',
+      wikiUsed:false, imageUrl:'', imageCaption:''
+    }:e);
+    renderTLEntries();
+    return;
+  }
+
+  // Successo — narrazione completa
+  tlEntries=tlEntries.map(e=>e.id===loadingId?{
+    ...e, loading:false, isOllama:true,
+    text: result.text,
+    wikiUsed: result.wikiUsed,
+    imageUrl: result.imageUrl||'',
+    imageCaption: result.imageCaption||'',
+    streetId: result.streetId||''
+  }:e);
+  renderTLEntries();
 }
 
 function startOllamaInterval(){ /* no-op */ }
