@@ -2546,22 +2546,40 @@ window.addEventListener('load', ()=>{
 // ━━━━━━━ SUPABASE AUTH ━━━━━━━
 const SUPA_URL = 'https://tnkibdwqoylzdpqsldsm.supabase.co';
 const SUPA_KEY = 'sb_publishable_9V8MJ4ugtkgIwpHqVbdecg_NGhBXO0u';
+const APP_URL  = 'https://vincenzoquatraro.github.io/locus/';
 let _supa, currentUser = null;
 
 function initSupabase(){
-  _supa = window.supabase.createClient(SUPA_URL, SUPA_KEY);
+  _supa = window.supabase.createClient(SUPA_URL, SUPA_KEY, {
+    auth: {
+      detectSessionInUrl: true,   // legge #access_token dall'URL al ritorno dal magic link
+      persistSession: true,       // mantiene la sessione tra ricariche
+      autoRefreshToken: true
+    }
+  });
 
-  // Controlla sessione esistente (magic link ritorno)
-  _supa.auth.getSession().then(({data:{session}})=>{
-    if(session){
+  // onAuthStateChange va registrato PRIMA di getSession
+  // così intercetta sia la sessione esistente che il token dall'URL
+  _supa.auth.onAuthStateChange((event, session)=>{
+    if(session && !currentUser){
       currentUser = session.user;
       showApp();
-    } else {
-      // Ascolta cambio sessione (magic link click)
-      _supa.auth.onAuthStateChange((_event, session)=>{
-        if(session){ currentUser = session.user; showApp(); }
-      });
-      // Mostra auth screen
+    }
+    // Pulisci l'URL dai token dopo il login (rimuove #access_token dall'URL)
+    if(event === 'SIGNED_IN' && window.location.hash.includes('access_token')){
+      history.replaceState(null, '', window.location.pathname);
+    }
+  });
+
+  // Poi controlla sessione esistente (es. ricarica pagina)
+  _supa.auth.getSession().then(({data:{session}})=>{
+    if(session && !currentUser){
+      currentUser = session.user;
+      showApp();
+    }
+    // Se nessuna sessione e nessun token nell'URL → mostra login
+    if(!session && !window.location.hash.includes('access_token')){
+      // Auth screen è già visibile di default, non fare nulla
     }
   });
 }
@@ -2569,12 +2587,13 @@ function initSupabase(){
 async function authSendLink(){
   const email = document.getElementById('auth-email').value.trim();
   const btn = document.getElementById('auth-btn');
-  const msg = document.getElementById('auth-msg');
   if(!email){ showAuthMsg('Inserisci la tua email', true); return; }
   btn.disabled = true; btn.textContent = 'Invio in corso…';
   const {error} = await _supa.auth.signInWithOtp({
     email,
-    options: { emailRedirectTo: window.location.href }
+    options: {
+      emailRedirectTo: APP_URL   // sempre GitHub Pages, mai localhost
+    }
   });
   btn.disabled = false; btn.textContent = 'Invia link di accesso';
   if(error){
