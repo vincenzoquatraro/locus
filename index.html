@@ -20,6 +20,8 @@
   --margin:42px;
   --tl-title-size:15px;
   --tl-txt-size:12px;
+  --bg-top-alpha: 1; /* Sfondo bianco solido */
+  --blur-val: 0;     /* Nessuna sfocatura */
 }
 html,body{height:100%;height:100dvh;overflow:hidden;background:var(--off);
   font-family:'DM Sans',sans-serif;color:var(--ink);-webkit-font-smoothing:antialiased}
@@ -233,6 +235,7 @@ html,body{height:100%;height:100dvh;overflow:hidden;background:var(--off);
   background:var(--ink3);width:48px;
 }
 #map-card{
+transition: border-radius 0.3s ease;
   position:relative;width:100%;height:100%;
   border-radius:18px;overflow:hidden;
   box-shadow:0 2px 16px rgba(0,0,0,.12);border:1px solid rgba(0,0,0,.06);
@@ -752,6 +755,100 @@ html,body{height:100%;height:100dvh;overflow:hidden;background:var(--off);
 .tl-empty-title{font-family:'DM Serif Display',serif;font-size:16px;color:var(--ink);opacity:.5}
 .tl-empty-sub{font-size:12px;color:var(--ink3);line-height:1.65;max-width:220px}
 
+#tl-section.hide-content #tl-scroll,
+#tl-section.hide-content #next-card {
+  display: none !important;
+  opacity: 0;
+  transition: opacity 0.3s ease;
+}
+
+/* --- CLASSI PER STATI DEL GRAB --- */
+
+/* 1. Mappa a tutto schermo (senza bordi e padding) - Usata per Grab SU e GIÙ */
+body.map-edge-to-edge #map-zone {
+  padding: 0 !important;
+  margin: 0 !important;
+}
+
+body.map-edge-to-edge #map-row {
+  padding: 0 !important;
+  margin: 0 !important;
+}
+body.map-edge-to-edge #map-card {
+  border-radius: 0 !important;
+  border: none !important;
+}
+
+/* 2. Nasconde la timeline ma lascia il "Sei in" - Usata SOLO per Grab GIÙ */
+
+/* Stili per il banner "Sei in" QUANDO la mappa è espansa al massimo */
+/* --- TRANSIZIONI FLUIDE --- */
+/* Aggiungiamo una transizione morbida di 0.3s a tutti gli elementi che cambiano stato */
+#map-zone, 
+#map-card, 
+#street-banner, 
+#tl-grab {
+  transition: all 0.3s ease-out !important;
+}
+
+
+/* Applichiamo lo sfondo collegato alle variabili dinamiche */
+
+
+/* --- CLASSI DI UTILITÀ (SNAP E BORDI) --- */
+
+/* --- TRANSIZIONI (SOLO AL RILASCIO) --- */
+/* Applichiamo la transizione solo quando il JS aggiunge la classe 'snap-transition' */
+body.snap-transition #street-banner,
+body.snap-transition #tl-grab,
+body.snap-transition #map-zone,
+body.snap-transition #map-card {
+  transition: all 0.3s ease-out !important;
+}
+
+/* --- RIMOZIONE BORDI E MARGINI ALLO STREET BANNER (MAPPA MAX) --- */
+body.hide-tl-content #street-banner {
+  margin-top: 0 !important;
+  margin-right: 0 !important;
+  margin-left: 0 !important;
+  padding-top: 0 !important;   
+  border: none !important;     /* Rimuove i bordi */
+  border-radius: 0 !important; /* Rimuove arrotondamento */
+  box-shadow: none !important;
+  background: transparent !important;
+  
+}
+
+body.hide-tl-content #tl-grab {
+background: transparent !important;
+}
+
+body.hide-tl-content #tl-section {
+  border-radius: 0 !important;
+  border: none !important;
+  background: linear-gradient(to right, 
+      rgba(255, 255, 255, var(--bg-top-alpha)) 0%, 
+      rgb(44, 44, 44) 60%
+  ) !important;
+}
+
+/* --- ESPANSIONE MAPPA --- */
+body.map-edge-to-edge #map-zone {
+  padding: 0 !important;
+}
+body.map-edge-to-edge #map-card {
+  border-radius: 0 !important;
+  border: none !important;
+}
+body.hide-tl-content #next-card-toggle, 
+body.hide-tl-content #tl-entries,
+body.hide-tl-content #tl-entries,
+body.hide-tl-content #ollama-dbg-hdr,
+body.hide-tl-content #ollama-dbg {
+
+  display: none !important;
+
+}
 
 </style>
 </head>
@@ -1016,6 +1113,18 @@ ollama serve</div>
 </div>
 
 <script>
+
+
+  const mapRow = document.getElementById('map-row');
+const tlSection = document.getElementById('tl-section');
+const tlGrab = document.getElementById('tl-grab');
+
+// Definiamo le 3 altezze in Viewport Height (vh) per la mappa
+const MAP_HEIGHT_MINIMIZED = 25; // Contenuto espanso, mappa piccola
+const MAP_HEIGHT_NORMAL = 48;    // Posizione intermedia
+const MAP_HEIGHT_EXPANDED = 85;  // Mappa grande, contenuto ridotto al "Sei in"
+
+let currentSheetState = 'NORMAL'; // Può essere 'MINIMIZED', 'NORMAL', 'EXPANDED'
 
   function openPOIPopup(p){
   const popup=document.getElementById('poi-popup');
@@ -1951,24 +2060,126 @@ function centerMap(){
 }
 
 // ── GRAB HANDLE — resize map-row height ──
+// (function(){
+//   const grab = document.getElementById('tl-grab');
+//   const mapRow = document.getElementById('map-row');
+//   if(!grab || !mapRow) return;
+
+//   const DEFAULT_H = window.innerHeight * 0.48;
+//   const MIN_H = window.innerHeight * 0.30;
+//   const MAX_H = window.innerHeight * 0.48;
+
+//   mapRow.style.height = DEFAULT_H + 'px';
+
+//   let startY = 0, startH = 0, dragging = false;
+//   let lastCenterY = 0; // traccia ogni quanti px ricalcoliamo il centro
+
+//   function scaleTL(mapH){
+//     const ratio = Math.max(0, Math.min(1, 1 - (mapH - MIN_H) / (DEFAULT_H - MIN_H)));
+//     document.documentElement.style.setProperty('--tl-title-size', (15 + ratio * 4) + 'px');
+//     document.documentElement.style.setProperty('--tl-txt-size',   (12 + ratio * 3) + 'px');
+//   }
+
+//   function onStart(clientY){
+//     dragging = true;
+//     startY = clientY;
+//     lastCenterY = clientY;
+//     startH = mapRow.offsetHeight;
+//     grab.classList.add('dragging');
+//     document.body.style.userSelect = 'none';
+//   }
+
+//   function onMove(clientY){
+//     if(!dragging) return;
+//     const newH = Math.min(MAX_H, Math.max(MIN_H, startH + (clientY - startY)));
+//     mapRow.style.height = newH + 'px';
+//     mapRow.style.transition = 'none';
+//     scaleTL(newH);
+//     // Ogni 5px di movimento ricalcola il centro esatto rispetto al nuovo div
+//     if(Math.abs(clientY - lastCenterY) >= 5){
+//       lastCenterY = clientY;
+//       centerMap();
+//     }
+//   }
+
+//   function onEnd(){
+//     if(!dragging) return;
+//     dragging = false;
+//     grab.classList.remove('dragging');
+//     document.body.style.userSelect = '';
+//     mapRow.style.transition = '';
+//     centerMap(); // centra una volta finale precisa
+//   }
+
+//   grab.addEventListener('touchstart', e=>onStart(e.touches[0].clientY), {passive:true});
+//   document.addEventListener('touchmove', e=>{if(dragging){e.preventDefault();onMove(e.touches[0].clientY);}},{passive:false});
+//   document.addEventListener('touchend', onEnd, {passive:true});
+//   grab.addEventListener('mousedown', e=>onStart(e.clientY));
+//   document.addEventListener('mousemove', e=>{if(dragging) onMove(e.clientY);});
+//   document.addEventListener('mouseup', onEnd);
+// })();
+
 (function(){
   const grab = document.getElementById('tl-grab');
   const mapRow = document.getElementById('map-row');
+  const banner = document.getElementById('street-banner');
   if(!grab || !mapRow) return;
 
-  const DEFAULT_H = window.innerHeight * 0.48;
-  const MIN_H = window.innerHeight * 0.30;
-  const MAX_H = window.innerHeight * 0.48;
+  let topOffset = 0, MAP_H_MIN = 0, MAP_H_MID = 0, MAP_H_MAX = 0;
 
-  mapRow.style.height = DEFAULT_H + 'px';
+  function updateHeights() {
+    topOffset = mapRow.offsetTop || 100;
+    MAP_H_MIN = window.innerHeight * 0.30;
+    MAP_H_MID = window.innerHeight * 0.48;
+    
+    // Leggiamo al volo l'ingombro attuale
+    const grabH = grab.offsetHeight || 30;
+    const bannerH = banner ? banner.offsetHeight : 80;
+    
+    // Lascia lo spazio vitale calcolato al millimetro
+    MAP_H_MAX = window.innerHeight - topOffset - grabH - bannerH - 80; 
+  }
+
+  // Set up iniziale
+  updateHeights();
+  mapRow.style.height = MAP_H_MID + 'px';
 
   let startY = 0, startH = 0, dragging = false;
-  let lastCenterY = 0; // traccia ogni quanti px ricalcoliamo il centro
+  let lastCenterY = 0;
+
+  // FUNZIONE DEDICATA PER UNO SFONDO FLUIDISSIMO
+  function applyBackground(ratio) {
+    const alpha = 1 - ratio; // Quando ratio è 1 (espanso), alpha è 0 (trasparente in alto)
+    const blur = 8 * ratio;  // Quando ratio è 1, blur è 8px
+    
+    const bgString = `linear-gradient(to bottom, rgba(255, 255, 255, ${alpha}) 0%, rgba(255, 255, 255, 1) 80%)`;
+    const blurString = `blur(${blur}px)`;
+
+    // Modifichiamo il CSS in tempo reale sul DOM (bypassando lag di transizione)
+    grab.style.background = bgString;
+    grab.style.backdropFilter = blurString;
+    grab.style.webkitBackdropFilter = blurString;
+
+    if(banner) {
+      banner.style.background = bgString;
+      banner.style.backdropFilter = blurString;
+      banner.style.webkitBackdropFilter = blurString;
+    }
+  }
 
   function scaleTL(mapH){
-    const ratio = Math.max(0, Math.min(1, 1 - (mapH - MIN_H) / (DEFAULT_H - MIN_H)));
-    document.documentElement.style.setProperty('--tl-title-size', (15 + ratio * 4) + 'px');
-    document.documentElement.style.setProperty('--tl-txt-size',   (12 + ratio * 3) + 'px');
+    const textRatio = Math.max(0, Math.min(1, 1 - (mapH - MAP_H_MIN) / (MAP_H_MID - MAP_H_MIN)));
+    document.documentElement.style.setProperty('--tl-title-size', (15 + textRatio * 4) + 'px');
+    document.documentElement.style.setProperty('--tl-txt-size',   (12 + textRatio * 3) + 'px');
+
+    let expandRatio = 0;
+    if(mapH > MAP_H_MID) {
+      expandRatio = (mapH - MAP_H_MID) / (MAP_H_MAX - MAP_H_MID);
+    }
+    expandRatio = Math.max(0, Math.min(1, expandRatio)); 
+    
+    // Applica colore ad ogni frame
+    applyBackground(expandRatio);
   }
 
   function onStart(clientY){
@@ -1976,20 +2187,29 @@ function centerMap(){
     startY = clientY;
     lastCenterY = clientY;
     startH = mapRow.offsetHeight;
+    
+    updateHeights(); 
+    
     grab.classList.add('dragging');
     document.body.style.userSelect = 'none';
+    mapRow.style.transition = 'none'; 
+    
+    // Rimuoviamo la transizione automatica CSS per seguire fluidamente il dito
+    document.body.classList.remove('map-edge-to-edge', 'hide-tl-content', 'snap-transition'); 
+    
+    scaleTL(mapRow.offsetHeight);
   }
 
   function onMove(clientY){
     if(!dragging) return;
-    const newH = Math.min(MAX_H, Math.max(MIN_H, startH + (clientY - startY)));
+    const newH = Math.min(MAP_H_MAX, Math.max(MAP_H_MIN, startH + (clientY - startY)));
     mapRow.style.height = newH + 'px';
-    mapRow.style.transition = 'none';
-    scaleTL(newH);
-    // Ogni 5px di movimento ricalcola il centro esatto rispetto al nuovo div
+    
+    scaleTL(newH); 
+    
     if(Math.abs(clientY - lastCenterY) >= 5){
       lastCenterY = clientY;
-      centerMap();
+      if(!window.userPannedMap && typeof centerMap === 'function') centerMap();
     }
   }
 
@@ -1998,9 +2218,33 @@ function centerMap(){
     dragging = false;
     grab.classList.remove('dragging');
     document.body.style.userSelect = '';
-    mapRow.style.transition = '';
-    centerMap(); // centra una volta finale precisa
+    
+    const currentH = mapRow.offsetHeight;
+    const anchors = [MAP_H_MIN, MAP_H_MID, MAP_H_MAX];
+    const closestH = anchors.reduce((prev, curr) => 
+      Math.abs(curr - currentH) < Math.abs(prev - currentH) ? curr : prev
+    );
+
+    // Rimettiamo la classe per far scattare fluidamente i margini finali
+    document.body.classList.add('snap-transition');
+
+    mapRow.style.transition = 'height 0.3s ease-out';
+    mapRow.style.height = closestH + 'px';
+
+    const finalRatio = (closestH === MAP_H_MAX) ? 1 : 0;
+    applyBackground(finalRatio);
+
+    if (closestH === MAP_H_MAX) {
+      document.body.classList.add('map-edge-to-edge', 'hide-tl-content');
+    } else if (closestH === MAP_H_MIN) {
+      document.body.classList.add('map-edge-to-edge');
+    }
+
+    if(!window.userPannedMap && typeof centerMap === 'function') centerMap();
   }
+
+  // Applica lo sfondo iniziale bianco al caricamento
+  applyBackground(0);
 
   grab.addEventListener('touchstart', e=>onStart(e.touches[0].clientY), {passive:true});
   document.addEventListener('touchmove', e=>{if(dragging){e.preventDefault();onMove(e.touches[0].clientY);}},{passive:false});
