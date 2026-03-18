@@ -580,6 +580,15 @@ html,body{height:100%;height:100dvh;overflow:hidden;background:var(--off);
   display:flex;align-items:center;justify-content:center;cursor:pointer;
 }
 
+/* ── SEZIONE CONTRIBUTI nella card ── */
+.tl-contribs-section{margin-top:10px;display:flex;flex-direction:column;gap:8px}
+.tl-contrib-block{padding:8px 10px;border-radius:0 8px 8px 0;background:var(--off)}
+.tl-contrib-header{display:flex;align-items:center;gap:6px;margin-bottom:4px}
+.tl-contrib-user{font-size:10px;font-weight:600;letter-spacing:.02em}
+.tl-contrib-type{font-size:10px;opacity:.6;margin-left:auto}
+.tl-contrib-text{font-size:12px;color:var(--ink2);line-height:1.55}
+.contrib-inline-photo{margin-top:7px;width:100%;max-height:160px;object-fit:cover;border-radius:8px;cursor:pointer;display:block}
+
 /* ── CONTRIBUTI EVIDENZIATI — colori per utente ── */
 .contrib-highlight{
   border-bottom:2px solid;
@@ -1974,23 +1983,51 @@ function renderTLEntries(){
       bodyHtml=`<div class="tl-shim"></div><div class="tl-shim" style="width:70%;margin-top:5px"></div>`;
     } else if(e.text){
       const contribs = e.contributions || [];
+      const COLORS = ['#007AFF','#34C759','#FF9500','#AF52DE','#FF3B30','#5AC8FA'];
 
-      const fullParsed  = parseContribTags(e.text, contribs);
+      // ── Sezione 1: narrazione principale (solo testo AI, senza contributi)
+      // Rimuovi i tag [[CONTRIB]] per la sezione narrazione pura
+      const narrationOnly = e.text
+        .replace(/\[\[CONTRIB:\d+\]\]([\s\S]*?)\[\[\/CONTRIB\]\]/g, '$1')
+        .replace(/\[\[CONTRIB:\d+\]\]|\[\[\/CONTRIB\]\]/g, '')
+        .trim();
+
       const PREVIEW_LEN = 120;
-      const isLong = e.text.length > PREVIEW_LEN;
-
-      // Per il preview usa il testo già parsato, troncato
-      const previewParsed = isLong
-        ? fullParsed.replace(/<[^>]+>/g, '').slice(0, PREVIEW_LEN).trimEnd() + '…'
-        : fullParsed;
-
+      const isLong = narrationOnly.length > PREVIEW_LEN;
+      const preview = isLong ? narrationOnly.slice(0, PREVIEW_LEN).trimEnd() + '…' : narrationOnly;
       const contribsJson = encodeURIComponent(JSON.stringify(contribs));
-      const fullEncoded  = encodeURIComponent(e.text); // testo raw per expandTL
+      const fullEncoded  = encodeURIComponent(e.text);
 
-      bodyHtml = isLong
-        ? `<div class="tl-txt tl-preview" id="txt-${eid}" data-contribs="${contribsJson}">${previewParsed}</div>
+      const narrationHtml = isLong
+        ? `<div class="tl-txt tl-preview" id="txt-${eid}" data-contribs="${contribsJson}">${preview}</div>
            <button class="tl-expand-btn" id="btn-${eid}" data-id="${eid}" data-text="${fullEncoded}" data-contribs="${contribsJson}">Leggi tutto ↓</button>`
-        : `<div class="tl-txt" data-contribs="${contribsJson}">${fullParsed}</div>`;
+        : `<div class="tl-txt" data-contribs="${contribsJson}">${narrationOnly}</div>`;
+
+      // ── Sezione 2: contributi utente — ognuno separato con colore proprio
+      let contribsHtml = '';
+      if(contribs.length > 0){
+        contribsHtml = `<div class="tl-contribs-section">` +
+          contribs.map((c, ci) => {
+            const color = COLORS[getUserColor(c.user_id) % COLORS.length];
+            const userShort = c.user_display || '👤 Utente';
+            const photoHtml = c.photo_url
+              ? `<img class="contrib-inline-photo" src="${c.photo_url}"
+                   onclick="window.open('${c.photo_url}','_blank')"
+                   alt="foto contributo"/>`
+              : '';
+            return `<div class="tl-contrib-block" style="border-left:3px solid ${color}">
+              <div class="tl-contrib-header" style="color:${color}">
+                <span class="tl-contrib-user">${userShort}</span>
+                <span class="tl-contrib-type">${c.type==='note'?'📝 Nota':'✏️ Correzione'}</span>
+              </div>
+              <div class="tl-contrib-text">${c.content}</div>
+              ${photoHtml}
+            </div>`;
+          }).join('') +
+        `</div>`;
+      }
+
+      bodyHtml = narrationHtml + contribsHtml;
     } else {
       bodyHtml='';
     }
@@ -2147,14 +2184,13 @@ function expandTL(eid, encodedText){
   if(!txtEl || !btnEl) return;
   const fullText = decodeURIComponent(encodedText);
 
-  // Recupera i contributi dal data attribute
-  let contribs = [];
-  try { contribs = JSON.parse(decodeURIComponent(btnEl.dataset.contribs||'[]')); } catch(e){}
+  // Mostra narrazione pulita (senza tag contrib)
+  const narrationOnly = fullText
+    .replace(/\[\[CONTRIB:\d+\]\]([\s\S]*?)\[\[\/CONTRIB\]\]/g, '$1')
+    .replace(/\[\[CONTRIB:\d+\]\]|\[\[\/CONTRIB\]\]/g, '')
+    .trim();
 
-  // Parsa i tag [[CONTRIB:N]] con la funzione centralizzata
-  const highlighted = parseContribTags(fullText, contribs);
-
-  txtEl.innerHTML = highlighted;
+  txtEl.textContent = narrationOnly;
   txtEl.classList.remove('tl-preview');
   btnEl.style.display = 'none';
 
