@@ -1937,40 +1937,41 @@ function renderTLEntries(){
     if(e.loading){
       bodyHtml=`<div class="tl-shim"></div><div class="tl-shim" style="width:70%;margin-top:5px"></div>`;
     } else if(e.text){
-      const PREVIEW_LEN = 120;
-      const isLong = e.text.length > PREVIEW_LEN;
-      const preview = isLong ? e.text.slice(0, PREVIEW_LEN).trimEnd() + '…' : e.text;
+      const contribs = e.contributions || [];
 
-      // Evidenzia frasi dei contributi nel testo
-      function highlightContribs(text, contribs){
-        if(!contribs || !contribs.length) return text;
-
-        // Dividi il testo in frasi
-        const sentences = text.match(/[^.!?]+[.!?]+/g) || [text];
-        if(sentences.length === 0) return text;
-
-        // Distribuisci i contributi sulle frasi del testo
-        // (Ollama li ha integrati — non possiamo trovare le parole esatte,
-        //  ma sappiamo che ogni contributo ha influenzato una parte del testo)
-        let result = '';
-        contribs.forEach((c, ci) => {
-          // Associa ogni contributo a una frase del testo (ciclicamente)
-          const sentIdx = ci % sentences.length;
-          sentences[sentIdx] = `<span class="contrib-highlight" data-contrib-idx="${ci}">${sentences[sentIdx].trim()}</span>`;
-        });
-        result = sentences.join(' ');
-        return result;
+      // Parsa i tag [[CONTRIB:N]]...[[/CONTRIB]] inseriti da Ollama
+      function parseContribTags(text, contribs){
+        if(!contribs.length) return text;
+        return text.replace(
+          /\[\[CONTRIB:(\d+)\]\]([\s\S]*?)\[\[\/CONTRIB\]\]/g,
+          (match, idx, content) => {
+            const i = parseInt(idx);
+            return `<span class="contrib-highlight" data-contrib-idx="${i}">${content.trim()}</span>`;
+          }
+        );
       }
 
-      const contribs = e.contributions || [];
-      const fullHighlighted = highlightContribs(e.text, contribs);
-      const previewHighlighted = highlightContribs(preview, contribs);
+      // Rimuovi eventuali tag non chiusi o malformati rimasti
+      function cleanLeftoverTags(text){
+        return text.replace(/\[\[CONTRIB:\d+\]\]|\[\[\/CONTRIB\]\]/g, '');
+      }
+
+      const fullParsed  = cleanLeftoverTags(parseContribTags(e.text, contribs));
+      const PREVIEW_LEN = 120;
+      const isLong = e.text.length > PREVIEW_LEN;
+
+      // Per il preview usa il testo già parsato, troncato
+      const previewParsed = isLong
+        ? fullParsed.replace(/<[^>]+>/g, '').slice(0, PREVIEW_LEN).trimEnd() + '…'
+        : fullParsed;
+
       const contribsJson = encodeURIComponent(JSON.stringify(contribs));
+      const fullEncoded  = encodeURIComponent(e.text); // testo raw per expandTL
 
       bodyHtml = isLong
-        ? `<div class="tl-txt tl-preview" id="txt-${eid}" data-contribs="${contribsJson}">${previewHighlighted}</div>
-           <button class="tl-expand-btn" id="btn-${eid}" data-id="${eid}" data-text="${encodeURIComponent(e.text)}" data-contribs="${contribsJson}">Leggi tutto ↓</button>`
-        : `<div class="tl-txt" data-contribs="${contribsJson}">${fullHighlighted}</div>`;
+        ? `<div class="tl-txt tl-preview" id="txt-${eid}" data-contribs="${contribsJson}">${previewParsed}</div>
+           <button class="tl-expand-btn" id="btn-${eid}" data-id="${eid}" data-text="${fullEncoded}" data-contribs="${contribsJson}">Leggi tutto ↓</button>`
+        : `<div class="tl-txt" data-contribs="${contribsJson}">${fullParsed}</div>`;
     } else {
       bodyHtml='';
     }
@@ -2117,13 +2118,12 @@ function expandTL(eid, encodedText){
   let contribs = [];
   try { contribs = JSON.parse(decodeURIComponent(btnEl.dataset.contribs||'[]')); } catch(e){}
 
-  // Rigenera testo completo con highlights
-  const sentences = fullText.match(/[^.!?]+[.!?]+/g) || [fullText];
-  contribs.forEach((c, ci) => {
-    const sentIdx = ci % sentences.length;
-    sentences[sentIdx] = `<span class="contrib-highlight" data-contrib-idx="${ci}">${sentences[sentIdx].trim()}</span>`;
-  });
-  const highlighted = sentences.join(' ');
+  // Parsa i tag [[CONTRIB:N]]...[[/CONTRIB]] inseriti da Ollama
+  const highlighted = fullText
+    .replace(/\[\[CONTRIB:(\d+)\]\]([\s\S]*?)\[\[\/CONTRIB\]\]/g, (match, idx, content) =>
+      `<span class="contrib-highlight" data-contrib-idx="${parseInt(idx)}">${content.trim()}</span>`
+    )
+    .replace(/\[\[CONTRIB:\d+\]\]|\[\[\/CONTRIB\]\]/g, '');
 
   txtEl.innerHTML = highlighted;
   txtEl.classList.remove('tl-preview');
