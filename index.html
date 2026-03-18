@@ -564,25 +564,32 @@ html,body{height:100%;height:100dvh;overflow:hidden;background:var(--off);
   z-index:99998;
   background:var(--ink);
   color:white;
-  border-radius:10px;
-  padding:8px 12px;
+  border-radius:12px;
+  padding:10px 14px;
   font-size:12px;
   line-height:1.5;
-  max-width:220px;
-  box-shadow:0 4px 20px rgba(0,0,0,.25);
+  max-width:240px;
+  min-width:160px;
+  box-shadow:0 6px 24px rgba(0,0,0,.3);
   pointer-events:none;
   opacity:0;
-  transform:translateY(4px);
-  transition:opacity .15s, transform .15s;
+  transform:translateY(6px) scale(.97);
+  transition:opacity .18s, transform .18s;
 }
 #contrib-popup.vis{
-  opacity:1;transform:translateY(0);
+  opacity:1;transform:translateY(0) scale(1);
 }
 #contrib-popup .cp-type{
-  font-size:10px;opacity:.6;margin-bottom:2px;text-transform:uppercase;letter-spacing:.04em;
+  font-size:10px;opacity:.55;margin-bottom:4px;
+  text-transform:uppercase;letter-spacing:.05em;font-weight:600;
 }
-#contrib-popup .cp-text{font-weight:400}
-#contrib-popup .cp-user{font-size:10px;opacity:.5;margin-top:4px}
+#contrib-popup .cp-text{
+  font-weight:400;color:white;word-break:break-word;
+}
+#contrib-popup .cp-user{
+  font-size:10px;opacity:.5;margin-top:6px;
+  border-top:1px solid rgba(255,255,255,.1);padding-top:5px;
+}
 
 /* ── GPS INDICATOR ── */
 #gps-indicator{
@@ -2522,7 +2529,7 @@ const N8N_URL = 'https://domonique-procompensation-elvin.ngrok-free.dev/webhook/
 async function callN8NAgent(streetName){
   if(ollamaLoading) return null;
   ollamaLoading = true;
-  dbg(`→ n8n: "${streetName}"`, 'req');
+  dbg(`→ "${streetName}" | city:${currentCity}`, 'req');
   try{
     const res = await fetch(N8N_URL, {
       method:'POST',
@@ -2530,18 +2537,26 @@ async function callN8NAgent(streetName){
       body:JSON.stringify({street:streetName, city:currentCity, country:currentCountry}),
       signal:AbortSignal.timeout(60000)
     });
-    if(!res.ok){ dbg(`✗ HTTP ${res.status}`,'err'); return null; }
+    if(!res.ok){
+      dbg(`✗ HTTP ${res.status} — n8n non raggiungibile`,'err');
+      return null;
+    }
     const data = await res.json();
-    if(data.success && data.text){
-      dbg(`✓ ${data.text.length} chars | src:${data.sourceUsed||'?'}`,'ok');
+    dbg(`✓ risposta: success=${data.success} noData=${data.noData} src=${data.sourceUsed||'?'} chars=${data.text?.length||0}`,'ok');
+
+    // Accetta qualsiasi risposta valida con testo — success true o false
+    if(data.text){
       return data;
     }
-    dbg(`✗ ${data.error||'risposta vuota'}`,'err');
+    dbg(`✗ risposta senza testo: ${JSON.stringify(data).slice(0,100)}`,'err');
     return null;
   }catch(e){
-    dbg(`✗ ${e.name==='TimeoutError'?'timeout 60s':e.message}`,'err');
+    const msg = e.name==='TimeoutError' ? 'timeout 60s' : e.message;
+    dbg(`✗ fetch error: ${msg}`,'err');
     return null;
-  }finally{ ollamaLoading=false; }
+  }finally{
+    ollamaLoading=false;
+  }
 }
 
 function toggleDbg(){
@@ -2593,27 +2608,26 @@ async function warmupOllama(){ dbg('n8n pronto','info'); }
 async function triggerOllamaForStreet(streetName, quarter=''){
   if(!streetName||streetName===lastOllamaStreet) return;
   lastOllamaStreet=streetName;
-  dbg(`trigger: "${streetName}"`,'info');
+  dbg(`trigger: "${streetName}" | ${currentCity}`,'info');
+
   const loadingId='ollama-'+Date.now();
   pushTL({id:loadingId,type:'cur',emoji:'<svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24"><path fill="currentColor" d="m20.713 7.128l-.246.566a.506.506 0 0 1-.934 0l-.246-.566a4.36 4.36 0 0 0-2.22-2.25l-.759-.339a.53.53 0 0 1 0-.963l.717-.319A4.37 4.37 0 0 0 19.276.931L19.53.32a.506.506 0 0 1 .942 0l.253.61a4.37 4.37 0 0 0 2.25 2.327l.718.32a.53.53 0 0 1 0 .962l-.76.338a4.36 4.36 0 0 0-2.219 2.251M8.5 6h-2v12h2zM4 10H2v4h2zm9-8h-2v20h2zm4.5 6h-2v10h2zm4.5 2h-2v4h2z"/></svg>',title:streetName,text:null,loading:true,isOllama:true});
 
   const result = await callN8NAgent(streetName);
 
   if(!result){
-    // n8n/ngrok non raggiungibile
     tlEntries=tlEntries.map(e=>e.id===loadingId?{
       ...e, loading:false, isOllama:true,
-      text:'⚠️ Agente non raggiungibile — controlla n8n e ngrok.'
+      text:`⚠️ Agente non raggiungibile.\nURL: ${N8N_URL}\nCittà: ${currentCity||'non rilevata'}`
     }:e);
     renderTLEntries();
     return;
   }
 
   if(result.noData){
-    // Nessuna info trovata — mostra invito a contribuire
     tlEntries=tlEntries.map(e=>e.id===loadingId?{
       ...e, loading:false, isOllama:true,
-      text: result.text,   // "Non ho trovato info... Vuoi contribuire?"
+      text: result.text,
       streetId: result.streetId||'',
       wikiUsed:false, imageUrl:'', imageCaption:'',
       _noData: true
@@ -2623,10 +2637,9 @@ async function triggerOllamaForStreet(streetName, quarter=''){
   }
 
   if(result._ollamaFailed){
-    // Info trovate ma Ollama non disponibile
     tlEntries=tlEntries.map(e=>e.id===loadingId?{
       ...e, loading:false, isOllama:true,
-      text: result.text,  // "Ho trovato info ma il modello AI non è raggiungibile..."
+      text: result.text,
       streetId: result.streetId||'',
       wikiUsed:false, imageUrl:'', imageCaption:''
     }:e);
@@ -2634,7 +2647,6 @@ async function triggerOllamaForStreet(streetName, quarter=''){
     return;
   }
 
-  // Successo — narrazione completa
   tlEntries=tlEntries.map(e=>e.id===loadingId?{
     ...e, loading:false, isOllama:true,
     text: result.text,
@@ -2665,21 +2677,34 @@ function showOllamaToast(msg){
 function showContribPopup(e, contrib){
   const popup = document.getElementById('contrib-popup');
   if(!popup) return;
-  const typeLabel = contrib.type==='note'?'📝 Nota utente':contrib.type==='correction'?'✏️ Correzione':'💬 Contributo';
+
+  const typeLabel = contrib.type==='note'?'📝 Nota'
+    : contrib.type==='correction'?'✏️ Correzione'
+    : '💬 Contributo';
+
+  const userDisplay = contrib.user_display || contrib.user_id?.slice(0,8)+'…' || 'Utente anonimo';
+  const date = contrib.created_at
+    ? new Date(contrib.created_at).toLocaleDateString('it-IT',{day:'numeric',month:'short',year:'numeric'})
+    : '';
+
   popup.querySelector('.cp-type').textContent = typeLabel;
   popup.querySelector('.cp-text').textContent = contrib.content;
-  popup.querySelector('.cp-user').textContent = '👤 Utente della community';
+  popup.querySelector('.cp-user').textContent = `👤 ${userDisplay}${date?' · '+date:''}`;
 
-  // Posiziona il popup vicino al click
-  const x = Math.min(e.clientX, window.innerWidth - 240);
-  const y = e.clientY - 10;
-  popup.style.left = x + 'px';
-  popup.style.top  = (y - popup.offsetHeight - 10) + 'px';
+  // Posiziona sopra il punto di click
+  popup.classList.remove('vis');
+  popup.style.left = '0px';
+  popup.style.top  = '0px';
+  document.body.appendChild(popup); // assicura che sia in body
 
-  popup.classList.add('vis');
-  // Riposiziona dopo il render (offsetHeight corretto)
   requestAnimationFrame(()=>{
-    popup.style.top = (e.clientY - popup.offsetHeight - 14) + 'px';
+    const pw = popup.offsetWidth  || 220;
+    const ph = popup.offsetHeight || 80;
+    const x  = Math.min(Math.max(e.clientX - pw/2, 8), window.innerWidth  - pw - 8);
+    const y  = e.clientY - ph - 12;
+    popup.style.left = x + 'px';
+    popup.style.top  = (y < 8 ? e.clientY + 12 : y) + 'px'; // se non c'è spazio sopra, metti sotto
+    popup.classList.add('vis');
   });
 }
 
