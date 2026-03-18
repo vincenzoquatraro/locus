@@ -558,6 +558,28 @@ html,body{height:100%;height:100dvh;overflow:hidden;background:var(--off);
 .contrib-star{cursor:pointer;opacity:.3;transition:opacity .15s}
 .contrib-star.on{opacity:1}
 
+/* ── FOTO CONTRIBUTO ── */
+.contrib-photo-row{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.contrib-photo-btn{
+  padding:5px 12px;border-radius:20px;border:1.5px dashed var(--border);
+  background:white;font-size:11px;color:var(--ink2);cursor:pointer;
+  font-family:'DM Sans',sans-serif;transition:all .15s;
+}
+.contrib-photo-btn:active{border-color:var(--blue);color:var(--blue)}
+.contrib-photo-preview{
+  position:relative;display:flex;align-items:center;gap:6px;
+}
+.contrib-photo-preview img{
+  width:56px;height:56px;border-radius:8px;object-fit:cover;
+  border:1.5px solid var(--border);
+}
+.contrib-photo-remove{
+  position:absolute;top:-6px;right:-6px;
+  width:16px;height:16px;border-radius:50%;
+  background:var(--ink);color:white;font-size:9px;
+  display:flex;align-items:center;justify-content:center;cursor:pointer;
+}
+
 /* ── CONTRIBUTI EVIDENZIATI — colori per utente ── */
 .contrib-highlight{
   border-bottom:2px solid;
@@ -609,6 +631,14 @@ html,body{height:100%;height:100dvh;overflow:hidden;background:var(--off);
 #contrib-popup .cp-user{
   font-size:10px;opacity:.5;margin-top:6px;
   border-top:1px solid rgba(255,255,255,.1);padding-top:5px;
+}
+#contrib-popup .cp-photo{
+  width:100%;max-height:140px;object-fit:cover;
+  border-radius:8px;margin-top:8px;cursor:pointer;
+  display:block;
+}
+#contrib-popup .cp-meta{
+  font-size:9px;opacity:.45;margin-top:4px;line-height:1.6;
 }
 
 /* ── GPS INDICATOR ── */
@@ -2005,6 +2035,19 @@ function renderTLEntries(){
           <span class="contrib-star" data-i="4">★</span>
           <span class="contrib-star" data-i="5">★</span>
         </div>
+        <!-- Foto -->
+        <div class="contrib-photo-row" id="contrib-photo-row-${eid}">
+          <input type="file" accept="image/*" capture="environment"
+            id="contrib-photo-input-${eid}" style="display:none"
+            onchange="onPhotoSelected(this,'${eid}')"/>
+          <button class="contrib-photo-btn" onclick="document.getElementById('contrib-photo-input-${eid}').click()">
+            📷 Aggiungi foto
+          </button>
+          <div class="contrib-photo-preview" id="contrib-photo-preview-${eid}" style="display:none">
+            <img id="contrib-photo-img-${eid}" src="" alt=""/>
+            <span class="contrib-photo-remove" data-eid="${eid}">✕</span>
+          </div>
+        </div>
         <div class="contrib-actions">
           <span class="contrib-cancel" data-eid="${eid}">Annulla</span>
           <button class="contrib-send" data-eid="${eid}" data-title="${e.title}">Invia</button>
@@ -2689,8 +2732,52 @@ function showOllamaToast(msg){
   setTimeout(()=>t.classList.remove('vis'),3500);
 }
 
+// ━━━━━━━ FOTO CONTRIBUTO ━━━━━━━
+const _photoState = {};
+let _lastOrientation = { heading: null, pitch: null, roll: null };
+window.addEventListener('deviceorientation', e => {
+  _lastOrientation.heading = e.alpha != null ? Math.round(e.alpha) : null;
+  _lastOrientation.pitch   = e.beta  != null ? Math.round(e.beta)  : null;
+  _lastOrientation.roll    = e.gamma != null ? Math.round(e.gamma) : null;
+}, true);
+
+function onPhotoSelected(input, eid){
+  const file = input.files[0];
+  if(!file) return;
+  const reader = new FileReader();
+  reader.onload = ev => {
+    const img = document.getElementById(`contrib-photo-img-${eid}`);
+    const preview = document.getElementById(`contrib-photo-preview-${eid}`);
+    const btn = input.closest('.contrib-photo-row').querySelector('.contrib-photo-btn');
+    if(img) img.src = ev.target.result;
+    if(preview) preview.style.display = 'flex';
+    if(btn) btn.style.display = 'none';
+  };
+  reader.readAsDataURL(file);
+  const orientation = { ..._lastOrientation };
+  const gps = uPos ? { lat: uPos.lat, lng: uPos.lng, altitude: null } : { lat: null, lng: null, altitude: null };
+  if(navigator.geolocation){
+    navigator.geolocation.getCurrentPosition(p => { gps.altitude = p.coords.altitude; }, ()=>{}, { enableHighAccuracy:true, timeout:3000 });
+  }
+  _photoState[eid] = { file, ...gps, ...orientation };
+}
+
+async function uploadContribPhoto(eid, streetId){
+  const state = _photoState[eid];
+  if(!state || !state.file) return null;
+  const ext = state.file.name.split('.').pop() || 'jpg';
+  const path = `contributions/${streetId}/${Date.now()}_${currentUser.id.slice(0,8)}.${ext}`;
+  const { data, error } = await _supa.storage.from('contributions').upload(path, state.file, { contentType: state.file.type, upsert: false });
+  if(error){ console.error('[Photo upload error]', error); return null; }
+  const { data: urlData } = _supa.storage.from('contributions').getPublicUrl(path);
+  return {
+    photo_url: urlData.publicUrl,
+    photo_lat: state.lat, photo_lng: state.lng, photo_altitude: state.altitude,
+    photo_heading: state.heading, photo_pitch: state.pitch, photo_roll: state.roll,
+  };
+}
+
 // ━━━━━━━ CONTRIB TAG PARSER ━━━━━━━
-// Mappa user_id → indice colore (0-5)
 const _userColorMap = {};
 let _userColorNext = 0;
 
@@ -2705,7 +2792,8 @@ function getUserColor(userId){
 
 function parseContribTags(text, contribs){
   if(!contribs || !contribs.length) return text;
-  // Parsa [[CONTRIB:N]]testo[[/CONTRIB]] → span colorato per utente
+
+  // Prova prima il formato corretto [[CONTRIB:N]]...[[/CONTRIB]]
   let result = text.replace(
     /\[\[CONTRIB:(\d+)\]\]([\s\S]*?)\[\[\/CONTRIB\]\]/g,
     (match, idx, content) => {
@@ -2716,8 +2804,37 @@ function parseContribTags(text, contribs){
       return `<span class="contrib-highlight" data-contrib-idx="${i}" data-color="${color}">${content.trim()}</span>`;
     }
   );
+
   // Rimuovi tag rimasti malformati
   result = result.replace(/\[\[CONTRIB:\d+\]\]|\[\[\/CONTRIB\]\]/g, '');
+
+  // Fallback: se nessun tag trovato ma ci sono contributi,
+  // cerca nel testo parole chiave del contributo e sottolinea quella frase
+  const tagFound = result.includes('contrib-highlight');
+  if(!tagFound){
+    const sentences = result.match(/[^.!?…]+[.!?…]+/g) || [result];
+    const used = new Set();
+    contribs.forEach((c, ci) => {
+      if(used.has(ci)) return;
+      // Cerca la frase del testo più simile al contributo
+      const cWords = c.content.toLowerCase().split(/\s+/).filter(w => w.length > 4);
+      let bestIdx = -1, bestScore = 0;
+      sentences.forEach((s, si) => {
+        if(used.has(si)) return;
+        const score = cWords.filter(w => s.toLowerCase().includes(w)).length;
+        if(score > bestScore){ bestScore = score; bestIdx = si; }
+      });
+      // Usa la frase più simile, o l'ultima frase come fallback
+      const targetIdx = bestIdx >= 0 ? bestIdx : (ci % sentences.length);
+      if(!used.has(targetIdx)){
+        const color = getUserColor(c.user_id);
+        sentences[targetIdx] = `<span class="contrib-highlight" data-contrib-idx="${ci}" data-color="${color}">${sentences[targetIdx].trim()}</span>`;
+        used.add(targetIdx);
+      }
+    });
+    result = sentences.join(' ');
+  }
+
   return result;
 }
 function showContribPopup(e, contrib, colorIdx=0){
@@ -2736,19 +2853,55 @@ function showContribPopup(e, contrib, colorIdx=0){
     ? new Date(contrib.created_at).toLocaleDateString('it-IT',{day:'numeric',month:'short',year:'numeric'})
     : '';
 
+  // Foto e dati orientamento
+  const hasPhoto = !!contrib.photo_url;
+  const photoHtml = hasPhoto
+    ? `<img class="cp-photo" src="${contrib.photo_url}" alt="Foto contributo" onclick="window.open('${contrib.photo_url}','_blank')"/>`
+    : '';
+
+  const gpsHtml = contrib.photo_lat
+    ? `<div class="cp-meta">📍 ${contrib.photo_lat.toFixed(5)}, ${contrib.photo_lng.toFixed(5)}
+       ${contrib.photo_altitude ? ` · ${Math.round(contrib.photo_altitude)}m` : ''}
+       ${contrib.photo_heading != null ? ` · 🧭 ${contrib.photo_heading}°` : ''}
+       ${contrib.photo_pitch != null ? ` · ↕ ${contrib.photo_pitch}°` : ''}</div>`
+    : '';
+
   popup.querySelector('.cp-type').textContent = typeLabel;
   popup.querySelector('.cp-text').textContent = contrib.content;
-  popup.querySelector('.cp-user').textContent = `👤 ${userDisplay}${date?' · '+date:''}`;
-  // Colora il bordo superiore del popup con il colore dell'utente
-  popup.style.borderTop = `3px solid ${color}`;
+  popup.querySelector('.cp-user').innerHTML = `👤 ${userDisplay}${date?' · '+date:''}`;
 
+  // Aggiungi/rimuovi sezioni foto e GPS
+  let cpPhoto = popup.querySelector('.cp-photo');
+  if(cpPhoto) cpPhoto.remove();
+  let cpMeta = popup.querySelector('.cp-meta');
+  if(cpMeta) cpMeta.remove();
+
+  if(hasPhoto){
+    const img = document.createElement('img');
+    img.className = 'cp-photo';
+    img.src = contrib.photo_url;
+    img.alt = 'Foto contributo';
+    img.onclick = () => window.open(contrib.photo_url, '_blank');
+    popup.querySelector('.cp-text').insertAdjacentElement('afterend', img);
+  }
+  if(contrib.photo_lat){
+    const meta = document.createElement('div');
+    meta.className = 'cp-meta';
+    meta.innerHTML = `📍 ${contrib.photo_lat.toFixed(5)}, ${contrib.photo_lng.toFixed(5)}`
+      + (contrib.photo_altitude ? ` · ${Math.round(contrib.photo_altitude)}m` : '')
+      + (contrib.photo_heading != null ? ` · 🧭 ${contrib.photo_heading}°` : '')
+      + (contrib.photo_pitch != null ? ` · ↕ ${contrib.photo_pitch}°` : '');
+    popup.querySelector('.cp-user').insertAdjacentElement('beforebegin', meta);
+  }
+
+  popup.style.borderTop = `3px solid ${color}`;
   popup.classList.remove('vis');
   document.body.appendChild(popup);
 
   requestAnimationFrame(()=>{
-    const pw = popup.offsetWidth  || 220;
+    const pw = popup.offsetWidth  || 240;
     const ph = popup.offsetHeight || 80;
-    const x  = Math.min(Math.max(e.clientX - pw/2, 8), window.innerWidth  - pw - 8);
+    const x  = Math.min(Math.max(e.clientX - pw/2, 8), window.innerWidth - pw - 8);
     const y  = e.clientY - ph - 12;
     popup.style.left = x + 'px';
     popup.style.top  = (y < 8 ? e.clientY + 12 : y) + 'px';
@@ -2973,16 +3126,31 @@ async function submitContrib(eid, streetTitle){
       if(!text){ showOllamaToast('Scrivi qualcosa prima'); return; }
       if(!streetId){ showOllamaToast('ID via mancante — ricarica la pagina'); return; }
 
+      // Upload foto se presente
+      let photoData = {};
+      if(_photoState[eid]?.file){
+        showOllamaToast('⏳ Carico foto…');
+        const uploaded = await uploadContribPhoto(eid, streetId);
+        if(uploaded) photoData = uploaded;
+      }
+
       const {data, error} = await _supa.from('contributions').insert({
         street_id: streetId,
         user_id: currentUser.id,
         type: activeTab || 'note',
-        content: text
+        content: text,
+        ...photoData
       });
 
       if(error){ console.error('[Contribution error]', error); showOllamaToast('Errore: ' + error.message); return; }
       showOllamaToast('✓ Contributo inviato, grazie!');
       if(textarea) textarea.value = '';
+      // Reset foto
+      _photoState[eid] = null;
+      const preview = document.getElementById(`contrib-photo-preview-${eid}`);
+      const photoBtn = document.querySelector(`#contrib-photo-row-${eid} .contrib-photo-btn`);
+      if(preview) preview.style.display = 'none';
+      if(photoBtn) photoBtn.style.display = '';
     }
 
     panel.classList.remove('vis');
