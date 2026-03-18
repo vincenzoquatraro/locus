@@ -525,6 +525,14 @@ html,body{height:100%;height:100dvh;overflow:hidden;background:var(--off);
 .auth-msg.visible{display:block}
 .auth-msg.error{background:rgba(255,59,48,.07);color:#ff3b30}
 .auth-footer{margin-top:32px;font-size:12px;color:var(--ink3);text-align:center;line-height:1.6}
+.auth-otp-input{
+  font-size:28px;font-weight:600;letter-spacing:10px;
+  text-align:center;padding:14px 10px;
+}
+.auth-back{
+  font-size:12px;color:var(--blue);cursor:pointer;
+  text-decoration:underline;text-underline-offset:2px;
+}
 #user-btn{width:30px;height:30px;border-radius:50%;border:1.5px solid var(--border);background:var(--off);display:flex;align-items:center;justify-content:center;font-size:14px;cursor:pointer;flex-shrink:0;transition:all .15s}
 #user-btn.logged-in{background:var(--ink);color:white;border-color:var(--ink)}
 .tl-flip-btn{position:absolute;top:8px;right:8px;width:22px;height:22px;border-radius:50%;border:1px solid var(--border);background:var(--off);display:flex;align-items:center;justify-content:center;font-size:11px;cursor:pointer;color:var(--ink3);transition:all .15s;z-index:2}
@@ -924,16 +932,36 @@ html,body{height:100%;height:100dvh;overflow:hidden;background:var(--off);
 <div id="contrib-popup"><div class="cp-type"></div><div class="cp-text"></div><div class="cp-user"></div></div>
 
 <!-- ━━━━━━━ AUTH SCREEN ━━━━━━━ -->
-<div id="auth-screen">  <div class="auth-logo">locus<span class="auth-logo-dot"></span></div>
+<div id="auth-screen">
+  <div class="auth-logo">locus<span class="auth-logo-dot"></span></div>
   <div class="auth-tagline">La tua guida locale AI.<br>Inserisci la tua email per accedere.</div>
-  <div class="auth-form">
+
+  <!-- Step 1: inserisci email -->
+  <div class="auth-form" id="auth-step-email">
     <div class="auth-label">Email</div>
-    <input class="auth-input" id="auth-email" type="email" placeholder="nome@email.com" autocomplete="email"/>
-    <button class="auth-btn" id="auth-btn" onclick="authSendLink()">Invia link di accesso</button>
+    <input class="auth-input" id="auth-email" type="email" placeholder="nome@email.com"
+      autocomplete="email" onkeydown="if(event.key==='Enter') authRequestOTP()"/>
+    <button class="auth-btn" id="auth-btn" onclick="authRequestOTP()">Invia codice</button>
     <div class="auth-msg" id="auth-msg"></div>
   </div>
-  <div class="auth-footer">
-    Ti invieremo un link magico via email.<br>Nessuna password necessaria.
+
+  <!-- Step 2: inserisci codice OTP -->
+  <div class="auth-form" id="auth-step-otp" style="display:none">
+    <div class="auth-label">Codice a 6 cifre</div>
+    <input class="auth-input auth-otp-input" id="auth-otp" type="text"
+      inputmode="numeric" maxlength="6" placeholder="123456"
+      autocomplete="one-time-code"
+      onkeydown="if(event.key==='Enter') authVerifyOTP()"
+      oninput="if(this.value.length===6) authVerifyOTP()"/>
+    <button class="auth-btn" id="auth-verify-btn" onclick="authVerifyOTP()">Accedi</button>
+    <div class="auth-msg" id="auth-otp-msg"></div>
+    <div style="text-align:center;margin-top:8px">
+      <span class="auth-back" onclick="authBackToEmail()">← Cambia email</span>
+    </div>
+  </div>
+
+  <div class="auth-footer" id="auth-footer">
+    Ti invieremo un codice di 6 cifre.<br>Nessuna password necessaria.
   </div>
 </div>
 <div id="app">
@@ -1256,7 +1284,7 @@ const SIM_MESSAGES = [
 ];
 
 // ━━━━━━━ STATE ━━━━━━━
-
+let map, uMark, rLayer, dMark, pLayers={};
 let uPos=null, places=[], selId=null;
 let mode='explore', filters=new Set(['all']);
 let heading=0;
@@ -1295,7 +1323,6 @@ function _setFollow(val){
 }
 
 // ━━━━━━━ MAP — Leaflet + OpenStreetMap ━━━━━━━
-let map, uMark, rLayer, dMark, pLayers={};
 
 function initMap(lat,lng){
   if(map){ map.setView([lat,lng],16); return; }
@@ -2768,23 +2795,81 @@ function initSupabase(){
   });
 }
 
-async function authSendLink(){
+async function authRequestOTP(){
   const email = document.getElementById('auth-email').value.trim();
   const btn = document.getElementById('auth-btn');
   if(!email){ showAuthMsg('Inserisci la tua email', true); return; }
+
   btn.disabled = true; btn.textContent = 'Invio in corso…';
+
   const {error} = await _supa.auth.signInWithOtp({
     email,
-    options: {
-      emailRedirectTo: APP_URL   // sempre GitHub Pages, mai localhost
-    }
+    options: { shouldCreateUser: true }
+    // Nessun emailRedirectTo — usa codice OTP, non magic link
   });
-  btn.disabled = false; btn.textContent = 'Invia link di accesso';
+
+  btn.disabled = false; btn.textContent = 'Invia codice';
+
   if(error){
-    showAuthMsg('Errore: ' + error.message, true);
-  } else {
-    showAuthMsg('✓ Link inviato! Controlla la tua email e clicca il link per accedere.', false);
+    if(error.status === 429){
+      showAuthMsg('Troppi tentativi. Attendi 60 secondi.', true);
+      let s=60; btn.disabled=true;
+      const t=setInterval(()=>{ s--; btn.textContent=`Riprova tra ${s}s`;
+        if(s<=0){clearInterval(t);btn.disabled=false;btn.textContent='Invia codice';}},1000);
+    } else {
+      showAuthMsg('Errore: ' + error.message, true);
+    }
+    return;
   }
+
+  // Mostra step OTP
+  document.getElementById('auth-step-email').style.display = 'none';
+  document.getElementById('auth-step-otp').style.display = '';
+  document.getElementById('auth-footer').textContent = `Codice inviato a ${email}`;
+  document.getElementById('auth-otp').focus();
+}
+
+async function authVerifyOTP(){
+  const email = document.getElementById('auth-email').value.trim();
+  const token = document.getElementById('auth-otp').value.trim();
+  const btn = document.getElementById('auth-verify-btn');
+
+  if(token.length < 6){ showOTPMsg('Inserisci il codice a 6 cifre', true); return; }
+
+  btn.disabled = true; btn.textContent = 'Verifica…';
+
+  const {data, error} = await _supa.auth.verifyOtp({
+    email,
+    token,
+    type: 'email'
+  });
+
+  btn.disabled = false; btn.textContent = 'Accedi';
+
+  if(error){
+    showOTPMsg('Codice errato o scaduto. Riprova.', true);
+    document.getElementById('auth-otp').value = '';
+    document.getElementById('auth-otp').focus();
+    return;
+  }
+
+  // Login riuscito
+  currentUser = data.user;
+  showApp();
+}
+
+function authBackToEmail(){
+  document.getElementById('auth-step-otp').style.display = 'none';
+  document.getElementById('auth-step-email').style.display = '';
+  document.getElementById('auth-otp').value = '';
+  document.getElementById('auth-footer').innerHTML = 'Ti invieremo un codice di 6 cifre.<br>Nessuna password necessaria.';
+  showOTPMsg('', false);
+}
+
+function showOTPMsg(text, isError){
+  const msg = document.getElementById('auth-otp-msg');
+  msg.textContent = text;
+  msg.className = 'auth-msg' + (text?' visible':'') + (isError?' error':'');
 }
 
 function showAuthMsg(text, isError){
