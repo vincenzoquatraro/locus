@@ -612,15 +612,32 @@ html,body{height:100%;height:100dvh;overflow:hidden;background:var(--off);
   font-size:10px;opacity:.5;flex-shrink:0;letter-spacing:.02em;
 }
 
-/* ── SEZIONE CONTRIBUTI nella card ── */
-.tl-contribs-section{margin-top:14px;padding-top:12px;border-top:1px solid var(--off2);display:flex;flex-direction:column;gap:8px}
-.tl-contribs-label{font-size:9px;font-weight:600;color:var(--ink3);letter-spacing:.06em;text-transform:uppercase;margin-bottom:2px}
-.tl-contrib-block{padding:10px 12px;border-radius:var(--radius-s);background:var(--white);border:1px solid var(--off2)}
-.tl-contrib-header{display:flex;align-items:center;gap:6px;margin-bottom:5px}
-.tl-contrib-user{font-size:10px;font-weight:600;letter-spacing:.02em}
-.tl-contrib-type{font-size:10px;opacity:.55;margin-left:auto;font-weight:500}
-.tl-contrib-text{font-size:12px;color:var(--ink2);line-height:1.6}
-.contrib-inline-photo{margin-top:7px;width:100%;max-height:160px;object-fit:cover;border-radius:8px;cursor:pointer;display:block}
+/* ── STORY LAYOUT — narrazione + immagine + contributi inline ── */
+.tl-story{position:relative}
+.tl-story::after{content:'';display:table;clear:both}
+.tl-img-figure{float:right;width:36%;margin:0 0 10px 12px;padding:0}
+.tl-wiki-img{width:100%;max-height:180px;border-radius:12px;object-fit:cover;object-position:center top;display:block;box-shadow:0 2px 12px rgba(0,0,0,.10)}
+.tl-img-caption{font-size:9px;color:var(--ink3);line-height:1.4;margin-top:5px;font-style:italic;text-align:center}
+.tl-contrib-para{
+  position:relative;margin:10px 0 0;padding:8px 10px 8px 36px;
+  border-radius:10px;
+  background:color-mix(in srgb, var(--contrib-color,#007AFF) 7%, white);
+  border-left:2.5px solid var(--contrib-color,#007AFF);
+  font-size:12px;color:var(--ink2);line-height:1.65;font-style:italic;
+  clear:both;
+}
+.tl-contrib-avatar{
+  position:absolute;left:8px;top:9px;
+  width:20px;height:20px;border-radius:50%;
+  color:white;font-size:10px;font-weight:700;font-style:normal;
+  display:flex;align-items:center;justify-content:center;
+  cursor:pointer;flex-shrink:0;user-select:none;
+  transition:transform .15s, box-shadow .15s;
+  box-shadow:0 1px 4px rgba(0,0,0,.2);
+}
+.tl-contrib-avatar:hover{transform:scale(1.15);box-shadow:0 2px 8px rgba(0,0,0,.25)}
+.tl-contrib-avatar:active{transform:scale(.9)}
+.contrib-inline-photo{display:block;margin-top:6px;width:100%;max-height:140px;object-fit:cover;border-radius:8px;cursor:pointer;font-style:normal}
 
 /* ── CONTRIBUTI EVIDENZIATI — colori per utente ── */
 .contrib-highlight{
@@ -2026,79 +2043,60 @@ function renderTLEntries(){
     } else if(e.text){
       const contribs = e.contributions || [];
       const COLORS = ['#007AFF','#34C759','#FF9500','#AF52DE','#FF3B30','#5AC8FA'];
+      const hasImg = !!(e.imageUrl);
 
-      // ── Sezione 1: narrazione principale (solo testo AI, senza contributi)
-      // Rimuovi i tag [[CONTRIB]] per la sezione narrazione pura
+      // Narrazione pulita dai tag [[CONTRIB]]
       const narrationOnly = e.text
         .replace(/\[\[CONTRIB:\d+\]\]([\s\S]*?)\[\[\/CONTRIB\]\]/g, '$1')
         .replace(/\[\[CONTRIB:\d+\]\]|\[\[\/CONTRIB\]\]/g, '')
         .trim();
 
-      const PREVIEW_LEN = 120;
+      // Immagine float right — integrata nel flusso del testo come una fiaba
+      const imgHtml = hasImg
+        ? `<figure class="tl-img-figure">
+             <img class="tl-wiki-img" src="${e.imageUrl}" alt="" loading="lazy"/>
+             ${e.imageCaption ? `<figcaption class="tl-img-caption">${e.imageCaption}</figcaption>` : ''}
+           </figure>`
+        : '';
+
+      // Contributi come paragrafi inline — stessa colonna del testo
+      const contribParas = contribs.map((c, ci) => {
+        const color = COLORS[getUserColor(c.user_id) % COLORS.length];
+        const contribsJson = encodeURIComponent(JSON.stringify(contribs));
+        const userShort = c.user_display || 'Utente';
+        const date = c.created_at
+          ? new Date(c.created_at).toLocaleDateString('it-IT',{day:'numeric',month:'short',year:'numeric'})
+          : '';
+        const photoHtml = c.photo_url
+          ? `<img class="contrib-inline-photo" src="${c.photo_url}" onclick="window.open('${c.photo_url}','_blank')" alt=""/>`
+          : '';
+        return `<p class="tl-contrib-para" style="--contrib-color:${color}" data-contribs="${contribsJson}" data-contrib-idx="${ci}">
+          <span class="tl-contrib-avatar" data-contrib-idx="${ci}" data-contribs="${contribsJson}"
+            title="${userShort}" style="background:${color}">
+            ${userShort.charAt(0).toUpperCase()}
+          </span>${c.content}${photoHtml}</p>`;
+      }).join('');
+
+      const PREVIEW_LEN = 160;
       const isLong = narrationOnly.length > PREVIEW_LEN;
       const preview = isLong ? narrationOnly.slice(0, PREVIEW_LEN).trimEnd() + '…' : narrationOnly;
       const contribsJson = encodeURIComponent(JSON.stringify(contribs));
       const fullEncoded  = encodeURIComponent(e.text);
 
-      const narrationHtml = isLong
-        ? `<div class="tl-txt tl-preview" id="txt-${eid}" data-contribs="${contribsJson}">${preview}</div>
-           <button class="tl-expand-btn" id="btn-${eid}" data-id="${eid}" data-text="${fullEncoded}" data-contribs="${contribsJson}">Leggi tutto ↓</button>`
-        : `<div class="tl-txt" data-contribs="${contribsJson}">${narrationOnly}</div>`;
+      const storyBlock = `<div class="tl-story" data-contribs="${contribsJson}">
+        ${imgHtml}
+        <p class="tl-txt" id="txt-${eid}">${isLong ? preview : narrationOnly}</p>
+        ${isLong ? `<button class="tl-expand-btn" id="btn-${eid}" data-id="${eid}" data-text="${fullEncoded}" data-contribs="${contribsJson}">Leggi tutto ↓</button>` : ''}
+        ${contribParas}
+      </div>`;
 
-      // ── Sezione 2: contributi utente — ognuno separato con colore proprio
-      let contribsHtml = '';
-      if(contribs.length > 0){
-        contribsHtml = `<div class="tl-contribs-section"><div class="tl-contribs-label">Contributi della community</div>` +
-          contribs.map((c, ci) => {
-            const color = COLORS[getUserColor(c.user_id) % COLORS.length];
-            const userShort = c.user_display || '👤 Utente';
-            const photoHtml = c.photo_url
-              ? `<img class="contrib-inline-photo" src="${c.photo_url}"
-                   onclick="window.open('${c.photo_url}','_blank')"
-                   alt="foto contributo"/>`
-              : '';
-            return `<div class="tl-contrib-block" style="border-left:3px solid ${color}">
-              <div class="tl-contrib-header" style="color:${color}">
-                <span class="tl-contrib-user">${userShort}</span>
-                <span class="tl-contrib-type">${c.type==='note'?'📝 Nota':'✏️ Correzione'}</span>
-              </div>
-              <div class="tl-contrib-text">${c.content}</div>
-              ${photoHtml}
-            </div>`;
-          }).join('') +
-        `</div>`;
-      }
-
-      bodyHtml = narrationHtml + contribsHtml;
+      bodyHtml = storyBlock;
     } else {
       bodyHtml='';
     }
 
-    const srcChips = [];
-    if(e.wikiUsed) srcChips.push(`<span class="tl-source-chip">📖 Wikipedia</span>`);
-    srcChips.push(`<span class="tl-source-chip">🤖 llama3.2</span>`);
-    const badge = e.isOllama && !e.loading
-      ? `<div class="ollama-badge">${srcChips.join('')}</div>`
-      : '';
-
-    // Audio player rimosso temporaneamente
-    const audioHtml = '';
-
-    const hasImg = !!(e.imageUrl && !e.loading);
-    const captionHtml = (hasImg && e.imageCaption)
-      ? `<div class="tl-img-caption">${e.imageCaption}</div>` : '';
-
-    // Immagine PRIMA del testo nel DOM — float:right la sposta a destra
-    // e il testo la avvolge naturalmente
-    const contentRow = hasImg
-      ? `<div class="tl-content-row">
-           <figure class="tl-img-figure">
-             <img class="tl-wiki-img" src="${e.imageUrl}" alt="" loading="lazy"/>
-             ${captionHtml}
-           </figure>
-           ${bodyHtml}
-         </div>`
-      : `<div class="tl-content-row">${bodyHtml}</div>`;
+    const hasImg = !!(e.imageUrl && !e.loading); // usato solo per contentRow legacy
+    const contentRow = `<div class="tl-content-row">${bodyHtml}</div>`;
 
     const streetId = e.streetId || '';
     const flipBtn = e.isOllama && !e.loading
@@ -2168,17 +2166,17 @@ document.addEventListener('click', function(e){
     expandTL(id, text);
   }
 
-  // Popup contributi al click sull'highlight
-  if(e.target.classList.contains('contrib-highlight')){
+  // Avatar contributo → popup
+  if(e.target.classList.contains('tl-contrib-avatar')){
     const idx = parseInt(e.target.dataset.contribIdx);
-    const contribsEl = e.target.closest('[data-contribs]');
-    if(!contribsEl) return;
     let contribs = [];
-    try { contribs = JSON.parse(decodeURIComponent(contribsEl.dataset.contribs||'[]')); } catch(err){}
+    try { contribs = JSON.parse(decodeURIComponent(e.target.dataset.contribs||'[]')); } catch(err){}
     const c = contribs[idx];
     if(!c) return;
-    const color = parseInt(e.target.dataset.color || 0);
-    showContribPopup(e, c, color);
+    const color = parseInt(e.target.style.background ? 0 : 0);
+    const COLORS = ['#007AFF','#34C759','#FF9500','#AF52DE','#FF3B30','#5AC8FA'];
+    const colorIdx = getUserColor(c.user_id);
+    showContribPopup(e, c, colorIdx);
     return;
   }
 
@@ -2232,7 +2230,7 @@ function expandTL(eid, encodedText){
   if(!txtEl || !btnEl) return;
   const fullText = decodeURIComponent(encodedText);
 
-  // Mostra narrazione pulita (senza tag contrib)
+  // Mostra narrazione pulita
   const narrationOnly = fullText
     .replace(/\[\[CONTRIB:\d+\]\]([\s\S]*?)\[\[\/CONTRIB\]\]/g, '$1')
     .replace(/\[\[CONTRIB:\d+\]\]|\[\[\/CONTRIB\]\]/g, '')
