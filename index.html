@@ -1595,7 +1595,7 @@ function setPos(lat,lng){
   document.getElementById('street-banner').classList.add('vis');
   fetchStreet(lat,lng);
   // Warmup model on start
-  warmupOllama();
+  
 }
 
 // ━━━━━━━ REVERSE GEOCODING — via attuale ━━━━━━━
@@ -2634,6 +2634,24 @@ function cancelRoute(silent){
 
 
 // ━━━━━━━ N8N AGENT ━━━━━━━
+// Pre-warm: carica il modello llama3.2 in GPU appena si ottiene il GPS
+// così la prima narrazione è veloce invece di attendere il caricamento
+async function warmupOllama(){
+  if(!ollamaEnabled || !ollamaIP) return;
+  dbg('⏳ Warmup modello in GPU…', 'info');
+  try {
+    const r = await fetch(`${ollamaIP}/api/generate`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'ngrok-skip-browser-warning': '1' },
+      body: JSON.stringify({ model: 'llama3.2', prompt: 'ok', stream: false, options: { num_predict: 1 } }),
+      signal: AbortSignal.timeout(60000)
+    });
+    if(r.ok) dbg('✓ Modello pronto in GPU', 'ok');
+  } catch(e) {
+    dbg(`warmup: ${e.message}`, 'info');
+  }
+}
+
 const N8N_URL = 'https://domonique-procompensation-elvin.ngrok-free.dev/webhook/locus-narrate';
 
 const _photoState = {};
