@@ -2121,7 +2121,7 @@ function renderTLEntries(){
         </div>
         <!-- Foto -->
         <div class="contrib-photo-row" id="contrib-photo-row-${eid}">
-          <input type="file" accept="image/*" capture="environment"
+          <input type="file" accept="image/*"
             id="contrib-photo-input-${eid}" style="display:none"
             onchange="onPhotoSelected(this,'${eid}')"/>
           <button class="contrib-photo-btn" onclick="document.getElementById('contrib-photo-input-${eid}').click()">
@@ -2830,13 +2830,20 @@ async function triggerOllamaForStreet(streetName, quarter=''){
     return;
   }
 
+  // Fallback: se n8n non ha restituito streetId, crea/trova la via direttamente
+  let finalStreetId = result.streetId || '';
+  if(!finalStreetId){
+    dbg('streetId mancante da n8n — fallback ensureStreet','info');
+    finalStreetId = await ensureStreet(streetName) || '';
+  }
+
   tlEntries=tlEntries.map(e=>e.id===loadingId?{
     ...e, loading:false, isOllama:true,
     text: result.text,
     wikiUsed: result.wikiUsed,
     imageUrl: result.imageUrl||'',
     imageCaption: result.imageCaption||'',
-    streetId: result.streetId||'',
+    streetId: finalStreetId,
     audioB64: '',  // vuoto inizialmente, arriva in background
     contributions: result.contributions||[]
   }:e);
@@ -2964,6 +2971,34 @@ function onPhotoSelected(input, eid){
     navigator.geolocation.getCurrentPosition(p => { gps.altitude = p.coords.altitude; }, ()=>{}, { enableHighAccuracy:true, timeout:3000 });
   }
   _photoState[eid] = { file, ...gps, ...orientation };
+}
+
+// Cerca o crea la via in Supabase — usato come fallback quando n8n non restituisce streetId
+async function ensureStreet(name){
+  if(!name || !_supa) return null;
+  try {
+    // 1. cerca prima per nome + città
+    const { data: found } = await _supa
+      .from('streets')
+      .select('id')
+      .ilike('name', name)
+      .eq('city', currentCity || '')
+      .maybeSingle();
+    if(found?.id){ dbg(`street trovata: ${found.id}`,'ok'); return found.id; }
+
+    // 2. non trovata — crea il record
+    const { data: ins, error } = await _supa
+      .from('streets')
+      .insert({ name, city: currentCity || '', country: currentCountry || '' })
+      .select('id')
+      .single();
+    if(error){ console.error('[ensureStreet insert]', error); return null; }
+    dbg(`street creata: ${ins?.id}`,'ok');
+    return ins?.id || null;
+  } catch(err){
+    console.error('[ensureStreet]', err);
+    return null;
+  }
 }
 
 async function uploadContribPhoto(eid, streetId){
@@ -3299,7 +3334,7 @@ async function submitContrib(eid, streetTitle){
 
   const panel = document.getElementById('contrib-'+eid);
   const activeTab = panel.querySelector('.contrib-tab.on')?.dataset.tab;
-  const streetId = panel.dataset.streetId;
+  let streetId = panel.dataset.streetId;
 
   console.log('[Contrib] eid:', eid, 'tab:', activeTab, 'streetId:', streetId, 'user:', currentUser?.id);
 
@@ -3310,10 +3345,20 @@ async function submitContrib(eid, streetTitle){
   sendBtn.disabled = true;
 
   try {
+    // Fallback: se streetId mancante, recupera/crea la via da Supabase
+    if(!streetId){
+      const entryTitle = document.getElementById('tl-title-'+eid)?.textContent || streetTitle;
+      if(entryTitle){
+        showOllamaToast('⏳ Recupero via…');
+        streetId = await ensureStreet(entryTitle) || '';
+        if(streetId) panel.dataset.streetId = streetId; // salva per i prossimi invii
+      }
+    }
+
     if(activeTab==='rating'){
       const score = parseInt(document.getElementById(`contrib-rating-${eid}`)?.dataset.score||0);
       if(!score){ showOllamaToast('Seleziona un voto prima'); return; }
-      if(!streetId){ showOllamaToast('ID via mancante — ricarica la pagina'); return; }
+      if(!streetId){ showOllamaToast('Impossibile identificare la via'); return; }
 
       const {data, error} = await _supa.from('ratings').upsert({
         street_id: streetId,
@@ -3328,7 +3373,7 @@ async function submitContrib(eid, streetTitle){
       const textarea = document.getElementById(`contrib-note-${eid}`);
       const text = textarea?.value?.trim();
       if(!text){ showOllamaToast('Scrivi qualcosa prima'); return; }
-      if(!streetId){ showOllamaToast('ID via mancante — ricarica la pagina'); return; }
+      if(!streetId){ showOllamaToast('Impossibile identificare la via'); return; }
 
       // Upload foto se presente
       let photoData = {};
