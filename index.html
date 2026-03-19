@@ -1182,7 +1182,7 @@ html,body{height:100%;height:100dvh;overflow:hidden;background:var(--off);
       <!-- DEBUG PANEL -->
       <div id="ollama-dbg">
         <div id="ollama-dbg-hdr" onclick="toggleDbg()">
-          <span>🔍 Debug Ollama</span>
+          <span>🔍 Debug</span>
           <span id="ollama-dbg-arrow">▸</span>
         </div>
         <div id="ollama-dbg-body" style="display:none">
@@ -1200,8 +1200,28 @@ html,body{height:100%;height:100dvh;overflow:hidden;background:var(--off);
           <button onclick="testOllamaManual()" style="
             margin-bottom:8px;padding:5px 12px;border-radius:8px;
             background:var(--ink);color:white;border:none;font-size:11px;cursor:pointer">
-            Testa connessione ora
+            Testa connessione
           </button>
+
+          <!-- Simulatore via — per test senza GPS -->
+          <div style="margin-top:8px;padding-top:8px;border-top:1px solid var(--off2)">
+            <div style="font-size:10px;color:var(--ink3);margin-bottom:5px;font-weight:600;text-transform:uppercase;letter-spacing:.04em">📍 Simula via (test senza GPS)</div>
+            <div style="display:flex;gap:6px;margin-bottom:4px">
+              <input id="dbg-street-input" placeholder="Nome via…"
+                onkeydown="if(event.key==='Enter')document.getElementById('dbg-city-input').focus()"
+                style="flex:2;padding:6px 8px;border:1px solid var(--border);border-radius:8px;font-size:11px;background:var(--off)"/>
+              <input id="dbg-city-input" placeholder="Città"
+                onkeydown="if(event.key==='Enter')simulateStreet()"
+                style="flex:1;padding:6px 8px;border:1px solid var(--border);border-radius:8px;font-size:11px;background:var(--off)"/>
+            </div>
+            <button onclick="simulateStreet()" style="
+              width:100%;padding:6px;border-radius:8px;
+              background:#34C759;color:white;border:none;font-size:11px;
+              cursor:pointer;font-weight:600">
+              ▶ Simula
+            </button>
+          </div>
+
           <div id="ollama-dbg-log"></div>
         </div>
       </div>
@@ -2707,6 +2727,27 @@ function updateDbgUrl(){
   const el=document.getElementById('ollama-dbg-url');
   if(el) el.textContent=`n8n: ${N8N_URL}`;
 }
+function simulateStreet(){
+  const street = document.getElementById('dbg-street-input')?.value?.trim();
+  const city   = document.getElementById('dbg-city-input')?.value?.trim();
+  if(!street){ dbg('Inserisci il nome della via','err'); return; }
+
+  // Imposta contesto globale come se il GPS fosse su quella via
+  if(city) currentCity = city;
+  currentCountry = currentCountry || 'Italia';
+
+  dbg(`▶ Simulo: "${street}" — ${currentCity}`,'req');
+
+  // Forza il trigger come se l'utente fosse fisicamente lì
+  lastStreetName = ''; // reset così non viene bloccato dal throttle
+  lastOllamaStreet = '';
+  triggerOllamaForStreet(street, '');
+
+  // Aggiorna anche il banner in cima
+  const el = document.getElementById('sb-street');
+  if(el){ el.textContent = street; el.className = 'sb-street'; }
+}
+
 function applyDbgUrl(){
   const val=document.getElementById('dbg-url-input')?.value?.trim();
   if(!val){dbg('Inserisci un URL','err');return;}
