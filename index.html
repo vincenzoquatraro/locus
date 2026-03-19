@@ -2057,8 +2057,13 @@ function renderTLEntries(){
             <span class="tl-contrib-name" style="color:${color}">${user}</span>
             <span class="tl-contrib-date">${date}</span>
           </div>
+        <div style="display:flex; flex-direction:row; align-items:center;">
           <p class="tl-contrib-body" style="color:${color}">${displayText}</p>
-          ${photoHtml}
+          
+          <div style="max-width:120px; width:100%; overflow:hidden; margin-left:10px;">
+            ${photoHtml}
+          </div>
+        </div>
         </div>`;
       }).join('');
 
