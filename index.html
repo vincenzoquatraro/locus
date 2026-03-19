@@ -2067,17 +2067,15 @@ function renderTLEntries(){
       ? `<div class="ollama-badge">${wikiBadge}🤖 llama3.2</div>`
       : '';
 
-    // Audio player
-    const hasAudio = !!(e.audioB64 && !e.loading);
-    if(hasAudio) _audioB64Store[eid] = e.audioB64; // salva in store globale
-    const audioHtml = hasAudio
+    // Audio player — appare subito come "in elaborazione", poi si attiva
+    const audioHtml = !e.loading
       ? `<div class="tl-audio-bar" id="audio-bar-${eid}">
-           <button class="tl-audio-play" id="audio-play-${eid}" onclick="toggleAudio('${eid}')">▶</button>
-           <span class="tl-audio-label">🎧 Audio guida</span>
+           <button class="tl-audio-play" id="audio-play-${eid}" onclick="toggleAudio('${eid}')" disabled style="opacity:.4">▶</button>
+           <span class="tl-audio-label" id="audio-label-${eid}">🎧 Audio in elaborazione…</span>
            <div class="tl-audio-track" id="audio-track-${eid}" onclick="seekAudio(event,'${eid}')">
              <div class="tl-audio-fill" id="audio-fill-${eid}"></div>
            </div>
-           <span class="tl-audio-time" id="audio-time-${eid}">0:00</span>
+           <span class="tl-audio-time" id="audio-time-${eid}"></span>
          </div>`
       : '';
 
@@ -2665,6 +2663,46 @@ function cancelRoute(silent){
 
 // ━━━━━━━ N8N AGENT ━━━━━━━
 const N8N_URL = 'https://domonique-procompensation-elvin.ngrok-free.dev/webhook/locus-narrate';
+const N8N_AUDIO_URL = 'https://domonique-procompensation-elvin.ngrok-free.dev/webhook/locus-audio';
+
+// Chiama il TTS in background — non blocca la UI
+async function requestAudioInBackground(eid, text){
+  if(!text) return;
+  try {
+    const res = await fetch(N8N_AUDIO_URL, {
+      method: 'POST',
+      headers: {'Content-Type':'application/json','Accept':'application/json'},
+      body: JSON.stringify({ text, eid }),
+      signal: AbortSignal.timeout(120000) // 2min timeout per TTS
+    });
+    if(!res.ok) return;
+    const data = await res.json();
+    if(data.audioB64 && data.audioB64.length > 100){
+      // Salva nel store e attiva il player nella card
+      _audioB64Store[eid] = data.audioB64;
+      _activateAudioPlayer(eid);
+      console.log('[Audio] Pronto per:', eid);
+    }
+  } catch(e){
+    console.log('[Audio background] errore:', e.message);
+  }
+}
+
+function _activateAudioPlayer(eid){
+  const btn   = document.getElementById(`audio-play-${eid}`);
+  const label = document.getElementById(`audio-label-${eid}`);
+  const time  = document.getElementById(`audio-time-${eid}`);
+
+  if(btn){
+    btn.disabled = false;
+    btn.style.opacity = '1';
+  }
+  if(label) label.textContent = '🎧 Audio guida';
+  if(time)  time.textContent  = '0:00';
+
+  // Auto-play
+  setTimeout(() => toggleAudio(eid), 300);
+}
 
 async function callN8NAgent(streetName){
   if(ollamaLoading) return null;
@@ -2794,11 +2832,12 @@ async function triggerOllamaForStreet(streetName, quarter=''){
     imageUrl: result.imageUrl||'',
     imageCaption: result.imageCaption||'',
     streetId: result.streetId||'',
-    audioB64: result.audioB64||'',
+    audioB64: '',  // vuoto inizialmente, arriva in background
     contributions: result.contributions||[]
   }:e);
   renderTLEntries();
-  if(result.audioB64) autoPlayAudioIfPresent(loadingId, result.audioB64);
+  // Avvia audio in background — non blocca la UI
+  requestAudioInBackground(loadingId, result.text);
 }
 
 function startOllamaInterval(){ /* no-op */ }
