@@ -580,14 +580,61 @@ html,body{height:100%;height:100dvh;overflow:hidden;background:var(--off);
   display:flex;align-items:center;justify-content:center;cursor:pointer;
 }
 
-/* ── SEZIONE CONTRIBUTI nella card ── */
-.tl-contribs-section{margin-top:10px;display:flex;flex-direction:column;gap:8px}
-.tl-contrib-block{padding:8px 10px;border-radius:0 8px 8px 0;background:var(--off)}
-.tl-contrib-header{display:flex;align-items:center;gap:6px;margin-bottom:4px}
-.tl-contrib-user{font-size:10px;font-weight:600;letter-spacing:.02em}
-.tl-contrib-type{font-size:10px;opacity:.6;margin-left:auto}
-.tl-contrib-text{font-size:12px;color:var(--ink2);line-height:1.55}
-.contrib-inline-photo{margin-top:7px;width:100%;max-height:160px;object-fit:cover;border-radius:8px;cursor:pointer;display:block}
+/* ── CARD BODY ── */
+.tl-card-body{ position:relative; overflow:hidden }
+.tl-card-body::after{ content:''; display:table; clear:both }
+
+/* Immagine incorniciata float right */
+.tl-img-figure{
+  float:right; width:34%; margin:2px 0 8px 12px; padding:0;
+}
+.tl-wiki-img{
+  width:100%; max-height:160px; border-radius:10px;
+  object-fit:cover; object-position:center top; display:block;
+  box-shadow:0 2px 10px rgba(0,0,0,.1);
+}
+.tl-img-caption{
+  font-size:9px; color:var(--ink3); line-height:1.4;
+  margin-top:4px; text-align:center; font-style:italic;
+}
+
+/* Testo narrazione vuoto/no-data */
+.tl-txt--empty{ font-style:italic; color:var(--ink3) }
+
+/* Contributo — blocco editoriale */
+.tl-contrib-entry{
+  margin-top:12px;
+  padding-top:10px;
+  border-top:1px solid var(--off2);
+  clear:both;
+}
+.tl-contrib-meta{
+  display:flex; align-items:center; gap:6px; margin-bottom:5px;
+}
+.tl-contrib-avatar{
+  width:22px; height:22px; border-radius:50%;
+  color:white; font-size:10px; font-weight:700;
+  display:flex; align-items:center; justify-content:center;
+  flex-shrink:0; cursor:pointer; user-select:none;
+  box-shadow:0 1px 4px rgba(0,0,0,.18);
+  transition:transform .15s var(--ease-spring);
+}
+.tl-contrib-avatar:active{ transform:scale(.88) }
+.tl-contrib-name{
+  font-size:11px; font-weight:600; letter-spacing:.01em;
+}
+.tl-contrib-date{
+  font-size:10px; color:var(--ink3); margin-left:auto;
+}
+.tl-contrib-body{
+  font-size:12.5px; line-height:1.65; margin:0;
+  font-weight:300;
+}
+.contrib-photo-block{
+  display:block; margin-top:8px; width:100%;
+  max-height:160px; object-fit:cover;
+  border-radius:10px; cursor:pointer;
+}
 
 /* ── CONTRIBUTI EVIDENZIATI — colori per utente ── */
 .contrib-highlight{
@@ -931,38 +978,9 @@ html,body{height:100%;height:100dvh;overflow:hidden;background:var(--off);
 
 /* ── TIMELINE CARD LAYOUT ── */
 .tl-b{flex:1;padding-bottom:12px;display:flex;flex-direction:column;gap:4px}
-
-/* Immagine float destra — il testo la avvolge */
-.tl-img-figure{
-  float:right;
-  width:33%;
-  margin:0 0 6px 10px;
-  padding:0;
-}
-.tl-wiki-img{
-  width:100%;
-  max-height:160px;
-  height:auto;
-  border-radius:8px;
-  object-fit:cover;
-  object-position:center top;
-  display:block;
-}
-.tl-img-caption{
-  font-size:9px;
-  color:var(--ink3);
-  line-height:1.4;
-  margin-top:4px;
-  text-align:center;
-  font-style:italic;
-}
-.tl-content-row{
-  overflow:hidden; /* clearfix */
-}
-.tl-content-row::after{
-  content:'';display:table;clear:both;
-}
-.tl-b-has-img{ display:flex;flex-direction:column;gap:4px; }
+.tl-content-row{ overflow:hidden }
+.tl-content-row::after{ content:'';display:table;clear:both }
+.tl-b-has-img{ display:flex;flex-direction:column;gap:4px }
 
 .tl-empty{
   display:flex;flex-direction:column;align-items:center;
@@ -1981,53 +1999,65 @@ function renderTLEntries(){
     let bodyHtml;
     if(e.loading){
       bodyHtml=`<div class="tl-shim"></div><div class="tl-shim" style="width:70%;margin-top:5px"></div>`;
-    } else if(e.text){
+    } else if(e.webNarration || e.text){
       const contribs = e.contributions || [];
       const COLORS = ['#007AFF','#34C759','#FF9500','#AF52DE','#FF3B30','#5AC8FA'];
 
-      // ── Sezione 1: narrazione principale (solo testo AI, senza contributi)
-      // Rimuovi i tag [[CONTRIB]] per la sezione narrazione pura
-      const narrationOnly = e.text
-        .replace(/\[\[CONTRIB:\d+\]\]([\s\S]*?)\[\[\/CONTRIB\]\]/g, '$1')
-        .replace(/\[\[CONTRIB:\d+\]\]|\[\[\/CONTRIB\]\]/g, '')
-        .trim();
+      // webNarration = testo Ollama sulla via (nuovo), text = legacy fallback
+      const webText = (e.webNarration || e.text || '').trim();
+      const hasWebContent = e.hasWebContent || (!e.noData && webText.length > 20);
 
-      const PREVIEW_LEN = 120;
-      const isLong = narrationOnly.length > PREVIEW_LEN;
-      const preview = isLong ? narrationOnly.slice(0, PREVIEW_LEN).trimEnd() + '…' : narrationOnly;
+      const PREVIEW_LEN = 200;
+      const isLong = webText.length > PREVIEW_LEN;
       const contribsJson = encodeURIComponent(JSON.stringify(contribs));
-      const fullEncoded  = encodeURIComponent(e.text);
+      const fullEncoded  = encodeURIComponent(webText);
 
-      const narrationHtml = isLong
-        ? `<div class="tl-txt tl-preview" id="txt-${eid}" data-contribs="${contribsJson}">${preview}</div>
+      // Immagine incorniciata float right
+      const imgHtml = e.imageUrl
+        ? `<figure class="tl-img-figure">
+             <img class="tl-wiki-img" src="${e.imageUrl}" alt="" loading="lazy"/>
+             ${e.imageCaption ? `<figcaption class="tl-img-caption">${e.imageCaption}</figcaption>` : ''}
+           </figure>`
+        : '';
+
+      // Sezione narrazione web
+      const narrationBlock = isLong
+        ? `<p class="tl-txt${!hasWebContent?' tl-txt--empty':''}" id="txt-${eid}">${webText.slice(0, PREVIEW_LEN).trimEnd()}…</p>
            <button class="tl-expand-btn" id="btn-${eid}" data-id="${eid}" data-text="${fullEncoded}" data-contribs="${contribsJson}">Leggi tutto ↓</button>`
-        : `<div class="tl-txt" data-contribs="${contribsJson}">${narrationOnly}</div>`;
+        : `<p class="tl-txt${!hasWebContent?' tl-txt--empty':''}" id="txt-${eid}">${webText}</p>`;
 
-      // ── Sezione 2: contributi utente — ognuno separato con colore proprio
-      let contribsHtml = '';
-      if(contribs.length > 0){
-        contribsHtml = `<div class="tl-contribs-section">` +
-          contribs.map((c, ci) => {
-            const color = COLORS[getUserColor(c.user_id) % COLORS.length];
-            const userShort = c.user_display || '👤 Utente';
-            const photoHtml = c.photo_url
-              ? `<img class="contrib-inline-photo" src="${c.photo_url}"
-                   onclick="window.open('${c.photo_url}','_blank')"
-                   alt="foto contributo"/>`
-              : '';
-            return `<div class="tl-contrib-block" style="border-left:3px solid ${color}">
-              <div class="tl-contrib-header" style="color:${color}">
-                <span class="tl-contrib-user">${userShort}</span>
-                <span class="tl-contrib-type">${c.type==='note'?'📝 Nota':'✏️ Correzione'}</span>
-              </div>
-              <div class="tl-contrib-text">${c.content}</div>
-              ${photoHtml}
-            </div>`;
-          }).join('') +
-        `</div>`;
-      }
+      // Contributi con testo rinarrato da Ollama (narrated_text) o originale
+      const contribBlocks = contribs.map((c, ci) => {
+        const color = COLORS[getUserColor(c.user_id) % COLORS.length];
+        const user = c.user_display || 'Utente';
+        const initial = user.charAt(0).toUpperCase();
+        const date = c.created_at
+          ? new Date(c.created_at).toLocaleString('it-IT',{day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'})
+          : '';
+        const cJson = encodeURIComponent(JSON.stringify(contribs));
+        const displayText = c.narrated_text || c.content;
+        const photoHtml = c.photo_url
+          ? `<img class="contrib-photo-block" src="${c.photo_url}" onclick="window.open('${c.photo_url}','_blank')" alt=""/>`
+          : '';
+        return `<div class="tl-contrib-entry" style="--cc:${color}">
+          <div class="tl-contrib-meta">
+            <span class="tl-contrib-avatar"
+              data-contrib-idx="${ci}"
+              data-contribs="${cJson}"
+              style="background:${color}">${initial}</span>
+            <span class="tl-contrib-name" style="color:${color}">${user}</span>
+            <span class="tl-contrib-date">${date}</span>
+          </div>
+          <p class="tl-contrib-body" style="color:${color}">${displayText}</p>
+          ${photoHtml}
+        </div>`;
+      }).join('');
 
-      bodyHtml = narrationHtml + contribsHtml;
+      bodyHtml = `<div class="tl-card-body">
+        ${imgHtml}
+        ${narrationBlock}
+        ${contribBlocks}
+      </div>`;
     } else {
       bodyHtml='';
     }
@@ -2037,21 +2067,7 @@ function renderTLEntries(){
       ? `<div class="ollama-badge">${wikiBadge}🤖 llama3.2</div>`
       : '';
 
-    const hasImg = !!(e.imageUrl && !e.loading);
-    const captionHtml = (hasImg && e.imageCaption)
-      ? `<div class="tl-img-caption">${e.imageCaption}</div>` : '';
-
-    // Immagine PRIMA del testo nel DOM — float:right la sposta a destra
-    // e il testo la avvolge naturalmente
-    const contentRow = hasImg
-      ? `<div class="tl-content-row">
-           <figure class="tl-img-figure">
-             <img class="tl-wiki-img" src="${e.imageUrl}" alt="" loading="lazy"/>
-             ${captionHtml}
-           </figure>
-           ${bodyHtml}
-         </div>`
-      : `<div class="tl-content-row">${bodyHtml}</div>`;
+    const contentRow = `<div class="tl-content-row">${bodyHtml}</div>`;
 
     const streetId = e.streetId || '';
     const flipBtn = e.isOllama && !e.loading
@@ -2120,7 +2136,18 @@ document.addEventListener('click', function(e){
     expandTL(id, text);
   }
 
-  // Popup contributi al click sull'highlight
+  // Avatar contributo → popup con data e utente
+  if(e.target.classList.contains('tl-contrib-avatar')){
+    const idx = parseInt(e.target.dataset.contribIdx);
+    let contribs = [];
+    try { contribs = JSON.parse(decodeURIComponent(e.target.dataset.contribs||'[]')); } catch(err){}
+    const c = contribs[idx];
+    if(!c) return;
+    showContribPopup(e, c, getUserColor(c.user_id));
+    return;
+  }
+
+  // Popup contributi al click sull'highlight (legacy)
   if(e.target.classList.contains('contrib-highlight')){
     const idx = parseInt(e.target.dataset.contribIdx);
     const contribsEl = e.target.closest('[data-contribs]');
@@ -2719,33 +2746,16 @@ async function triggerOllamaForStreet(streetName, quarter=''){
     return;
   }
 
-  if(result.noData){
-    tlEntries=tlEntries.map(e=>e.id===loadingId?{
-      ...e, loading:false, isOllama:true,
-      text: result.text,
-      streetId: result.streetId||'',
-      wikiUsed:false, imageUrl:'', imageCaption:'',
-      _noData: true
-    }:e);
-    renderTLEntries();
-    return;
-  }
-
-  if(result._ollamaFailed){
-    tlEntries=tlEntries.map(e=>e.id===loadingId?{
-      ...e, loading:false, isOllama:true,
-      text: result.text,
-      streetId: result.streetId||'',
-      wikiUsed:false, imageUrl:'', imageCaption:''
-    }:e);
-    renderTLEntries();
-    return;
-  }
+  // Mapping unificato — usa webNarration (nuovo campo) o text (fallback legacy)
+  const webNarration = result.webNarration || result.text || '';
+  const hasWebContent = result.hasWebContent || false;
 
   tlEntries=tlEntries.map(e=>e.id===loadingId?{
     ...e, loading:false, isOllama:true,
-    text: result.text,
-    wikiUsed: result.wikiUsed,
+    webNarration,
+    hasWebContent,
+    noData: result.noData || !hasWebContent,
+    wikiUsed: result.wikiUsed||false,
     imageUrl: result.imageUrl||'',
     imageCaption: result.imageCaption||'',
     streetId: result.streetId||'',
@@ -2880,54 +2890,36 @@ function showContribPopup(e, contrib, colorIdx=0){
   const COLORS = ['#007AFF','#34C759','#FF9500','#AF52DE','#FF3B30','#5AC8FA'];
   const color = COLORS[colorIdx % COLORS.length];
 
-  const typeLabel = contrib.type==='note'?'📝 Nota'
-    : contrib.type==='correction'?'✏️ Correzione'
+  const typeLabel = contrib.type==='note' ? '📝 Nota'
+    : contrib.type==='correction' ? '✏️ Correzione'
     : '💬 Contributo';
 
-  const userDisplay = contrib.user_display || contrib.user_id?.slice(0,8)+'…' || 'Utente anonimo';
+  const userDisplay = contrib.user_display || 'Utente anonimo';
   const date = contrib.created_at
-    ? new Date(contrib.created_at).toLocaleDateString('it-IT',{day:'numeric',month:'short',year:'numeric'})
-    : '';
-
-  // Foto e dati orientamento
-  const hasPhoto = !!contrib.photo_url;
-  const photoHtml = hasPhoto
-    ? `<img class="cp-photo" src="${contrib.photo_url}" alt="Foto contributo" onclick="window.open('${contrib.photo_url}','_blank')"/>`
-    : '';
-
-  const gpsHtml = contrib.photo_lat
-    ? `<div class="cp-meta">📍 ${contrib.photo_lat.toFixed(5)}, ${contrib.photo_lng.toFixed(5)}
-       ${contrib.photo_altitude ? ` · ${Math.round(contrib.photo_altitude)}m` : ''}
-       ${contrib.photo_heading != null ? ` · 🧭 ${contrib.photo_heading}°` : ''}
-       ${contrib.photo_pitch != null ? ` · ↕ ${contrib.photo_pitch}°` : ''}</div>`
+    ? new Date(contrib.created_at).toLocaleString('it-IT',{
+        day:'numeric', month:'long', year:'numeric',
+        hour:'2-digit', minute:'2-digit'
+      })
     : '';
 
   popup.querySelector('.cp-type').textContent = typeLabel;
-  popup.querySelector('.cp-text').textContent = contrib.content;
-  popup.querySelector('.cp-user').innerHTML = `👤 ${userDisplay}${date?' · '+date:''}`;
+  popup.querySelector('.cp-text').innerHTML = `<strong style="font-size:13px">${userDisplay}</strong>`;
+  popup.querySelector('.cp-user').textContent = date;
 
-  // Aggiungi/rimuovi sezioni foto e GPS
-  let cpPhoto = popup.querySelector('.cp-photo');
-  if(cpPhoto) cpPhoto.remove();
-  let cpMeta = popup.querySelector('.cp-meta');
-  if(cpMeta) cpMeta.remove();
+  popup.querySelectorAll('.cp-photo,.cp-meta').forEach(el => el.remove());
 
-  if(hasPhoto){
+  if(contrib.photo_url){
     const img = document.createElement('img');
-    img.className = 'cp-photo';
-    img.src = contrib.photo_url;
-    img.alt = 'Foto contributo';
+    img.className = 'cp-photo'; img.src = contrib.photo_url; img.alt = '';
     img.onclick = () => window.open(contrib.photo_url, '_blank');
-    popup.querySelector('.cp-text').insertAdjacentElement('afterend', img);
+    popup.querySelector('.cp-user').insertAdjacentElement('afterend', img);
   }
   if(contrib.photo_lat){
     const meta = document.createElement('div');
     meta.className = 'cp-meta';
-    meta.innerHTML = `📍 ${contrib.photo_lat.toFixed(5)}, ${contrib.photo_lng.toFixed(5)}`
-      + (contrib.photo_altitude ? ` · ${Math.round(contrib.photo_altitude)}m` : '')
-      + (contrib.photo_heading != null ? ` · 🧭 ${contrib.photo_heading}°` : '')
-      + (contrib.photo_pitch != null ? ` · ↕ ${contrib.photo_pitch}°` : '');
-    popup.querySelector('.cp-user').insertAdjacentElement('beforebegin', meta);
+    meta.textContent = `📍 ${contrib.photo_lat.toFixed(5)}, ${contrib.photo_lng.toFixed(5)}`
+      + (contrib.photo_heading != null ? ` · 🧭 ${contrib.photo_heading}°` : '');
+    popup.querySelector('.cp-user').insertAdjacentElement('afterend', meta);
   }
 
   popup.style.borderTop = `3px solid ${color}`;
@@ -2935,8 +2927,8 @@ function showContribPopup(e, contrib, colorIdx=0){
   document.body.appendChild(popup);
 
   requestAnimationFrame(()=>{
-    const pw = popup.offsetWidth  || 240;
-    const ph = popup.offsetHeight || 80;
+    const pw = popup.offsetWidth  || 200;
+    const ph = popup.offsetHeight || 70;
     const x  = Math.min(Math.max(e.clientX - pw/2, 8), window.innerWidth - pw - 8);
     const y  = e.clientY - ph - 12;
     popup.style.left = x + 'px';
