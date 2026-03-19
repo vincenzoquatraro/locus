@@ -2067,17 +2067,8 @@ function renderTLEntries(){
       ? `<div class="ollama-badge">${wikiBadge}🤖 llama3.2</div>`
       : '';
 
-    // Audio player — appare subito come "in elaborazione", poi si attiva
-    const audioHtml = !e.loading
-      ? `<div class="tl-audio-bar" id="audio-bar-${eid}">
-           <button class="tl-audio-play" id="audio-play-${eid}" onclick="toggleAudio('${eid}')" disabled style="opacity:.4">▶</button>
-           <span class="tl-audio-label" id="audio-label-${eid}">🎧 Audio in elaborazione…</span>
-           <div class="tl-audio-track" id="audio-track-${eid}" onclick="seekAudio(event,'${eid}')">
-             <div class="tl-audio-fill" id="audio-fill-${eid}"></div>
-           </div>
-           <span class="tl-audio-time" id="audio-time-${eid}"></span>
-         </div>`
-      : '';
+    // Audio player rimosso temporaneamente
+    const audioHtml = '';
 
     const hasImg = !!(e.imageUrl && !e.loading);
     const captionHtml = (hasImg && e.imageCaption)
@@ -2836,8 +2827,6 @@ async function triggerOllamaForStreet(streetName, quarter=''){
     contributions: result.contributions||[]
   }:e);
   renderTLEntries();
-  // Avvia audio in background — non blocca la UI
-  requestAudioInBackground(loadingId, result.text);
 }
 
 function startOllamaInterval(){ /* no-op */ }
