@@ -419,9 +419,9 @@ html,body{height:100%;height:100dvh;overflow:hidden;background:var(--off);
 .tl-ln{flex:1;width:1.5px;background:var(--border);margin:2px 0;min-height:12px}
 .tl-ln.dash{background:repeating-linear-gradient(to bottom,var(--border) 0,var(--border) 4px,transparent 4px,transparent 8px)}
 .tl-b{flex:1;padding-bottom:12px}
-.tl-t{font-size:9px;color:var(--ink3);letter-spacing:.04em;margin-bottom:2px}
+.tl-t{font-size:9px;color:var(--ink3);letter-spacing:.06em;text-transform:uppercase;font-weight:500;margin-bottom:4px;opacity:.65}
 .tl-title{font-family:'DM Serif Display',serif;font-size:var(--tl-title-size);color:var(--ink);
-  line-height:1.25;margin-bottom:4px;letter-spacing:-.01em;transition:font-size .2s}
+  line-height:1.2;margin-bottom:8px;letter-spacing:-.02em;transition:font-size .2s;font-weight:400}
 .tl-txt{font-size:var(--tl-txt-size);line-height:1.65;color:var(--ink2);font-weight:300;transition:font-size .2s}
 .tl-dist{display:inline-flex;align-items:center;gap:3px;margin-top:5px;
   font-size:10px;font-weight:500;color:var(--blue);background:rgba(0,122,255,.07);
@@ -539,8 +539,10 @@ html,body{height:100%;height:100dvh;overflow:hidden;background:var(--off);
 .auth-tab.on{background:white;color:var(--ink);box-shadow:0 1px 4px rgba(0,0,0,.1)}
 #user-btn{width:30px;height:30px;border-radius:50%;border:1.5px solid var(--border);background:var(--off);display:flex;align-items:center;justify-content:center;font-size:14px;cursor:pointer;flex-shrink:0;transition:all .15s}
 #user-btn.logged-in{background:var(--ink);color:white;border-color:var(--ink)}
-.tl-flip-btn{position:absolute;top:8px;right:8px;width:22px;height:22px;border-radius:50%;border:1px solid var(--border);background:var(--off);display:flex;align-items:center;justify-content:center;font-size:11px;cursor:pointer;color:var(--ink3);transition:all .15s;z-index:2}
-.tl-flip-btn:active{background:var(--ink);color:white;border-color:var(--ink)}
+.tl-flip-btn{position:absolute;top:8px;right:8px;width:28px;height:28px;border-radius:50%;border:1.5px solid var(--border);background:var(--off);display:flex;align-items:center;justify-content:center;font-size:14px;cursor:pointer;color:var(--ink2);transition:background var(--dur-fast) var(--ease-smooth),border-color var(--dur-fast) var(--ease-smooth),color var(--dur-fast) var(--ease-smooth),transform var(--dur-fast) var(--ease-spring);z-index:2}
+.tl-flip-btn::after{content:'';position:absolute;inset:-8px}
+.tl-flip-btn:hover{background:var(--ink);color:white;border-color:var(--ink)}
+.tl-flip-btn:active{background:var(--ink);color:white;border-color:var(--ink);transform:scale(.85)}
 .tl-e-wrap{position:relative}
 .contrib-panel{display:none;background:var(--off);border-radius:10px;padding:10px 12px;margin-top:6px;flex-direction:column;gap:8px}
 .contrib-panel.vis{display:flex}
@@ -611,12 +613,13 @@ html,body{height:100%;height:100dvh;overflow:hidden;background:var(--off);
 }
 
 /* ── SEZIONE CONTRIBUTI nella card ── */
-.tl-contribs-section{margin-top:10px;display:flex;flex-direction:column;gap:8px}
-.tl-contrib-block{padding:8px 10px;border-radius:0 8px 8px 0;background:var(--off)}
-.tl-contrib-header{display:flex;align-items:center;gap:6px;margin-bottom:4px}
+.tl-contribs-section{margin-top:14px;padding-top:12px;border-top:1px solid var(--off2);display:flex;flex-direction:column;gap:8px}
+.tl-contribs-label{font-size:9px;font-weight:600;color:var(--ink3);letter-spacing:.06em;text-transform:uppercase;margin-bottom:2px}
+.tl-contrib-block{padding:10px 12px;border-radius:var(--radius-s);background:var(--white);border:1px solid var(--off2)}
+.tl-contrib-header{display:flex;align-items:center;gap:6px;margin-bottom:5px}
 .tl-contrib-user{font-size:10px;font-weight:600;letter-spacing:.02em}
-.tl-contrib-type{font-size:10px;opacity:.6;margin-left:auto}
-.tl-contrib-text{font-size:12px;color:var(--ink2);line-height:1.55}
+.tl-contrib-type{font-size:10px;opacity:.55;margin-left:auto;font-weight:500}
+.tl-contrib-text{font-size:12px;color:var(--ink2);line-height:1.6}
 .contrib-inline-photo{margin-top:7px;width:100%;max-height:160px;object-fit:cover;border-radius:8px;cursor:pointer;display:block}
 
 /* ── CONTRIBUTI EVIDENZIATI — colori per utente ── */
@@ -845,21 +848,26 @@ html,body{height:100%;height:100dvh;overflow:hidden;background:var(--off);
   background:rgba(255,149,0,.07);border-radius:8px;
   padding:8px 10px;margin-bottom:12px;line-height:1.5}
 
-/* Ollama badge on timeline card */
-.ollama-badge{
-  display:inline-flex;align-items:center;gap:5px;
-  margin-top:9px;font-size:9px;font-weight:500;color:var(--ink3);
-  background:var(--off);padding:3px 8px;border-radius:20px;
+/* Ollama badge on timeline card — contenitore dei chip fonte */
+.ollama-badge{display:flex;align-items:center;gap:5px;flex-wrap:wrap;margin-top:10px}
+/* Chip singolo fonte (Wikipedia / AI) */
+.tl-source-chip{
+  display:inline-flex;align-items:center;gap:3px;
+  font-size:9px;font-weight:500;color:var(--ink3);letter-spacing:.03em;
+  background:var(--off);border:1px solid var(--off2);
+  padding:2px 8px;border-radius:var(--radius-pill);
 }
 
 /* Shimmer for loading cards */
 .tl-shim{
-  height:12px;border-radius:4px;
+  height:11px;border-radius:4px;
   background:linear-gradient(90deg,var(--off) 25%,var(--off2) 50%,var(--off) 75%);
   background-size:200% 100%;
   animation:shimmer 1.4s infinite;
   width:90%;
 }
+.tl-shim--title{height:17px;width:52%;border-radius:5px}
+.tl-shim--short{width:40%}
 @keyframes shimmer{0%{background-position:-200% 0}100%{background-position:200% 0}}
 
 /* Toast notification */
@@ -956,27 +964,28 @@ html,body{height:100%;height:100dvh;overflow:hidden;background:var(--off);
   transition:background .15s;letter-spacing:.01em;
 }
 .tl-expand-btn:active{background:var(--border)}
-.wiki-badge{display:inline-block;margin-right:5px;font-size:10px;color:#636366}
-.ollama-badge{display:flex;align-items:center;gap:2px;flex-wrap:wrap;margin-top:6px}
+.wiki-badge{display:inline-flex;align-items:center;gap:3px;font-size:9px;font-weight:500;color:var(--ink3);letter-spacing:.03em}
 
 /* ── TIMELINE CARD LAYOUT ── */
-.tl-b{flex:1;padding-bottom:12px;display:flex;flex-direction:column;gap:4px}
+.tl-b{flex:1;padding-bottom:14px;display:flex;flex-direction:column;gap:6px}
 
 /* Immagine float destra — il testo la avvolge */
 .tl-img-figure{
   float:right;
-  width:33%;
-  margin:0 0 6px 10px;
+  width:34%;
+  min-width:80px;
+  margin:0 0 8px 10px;
   padding:0;
 }
 .tl-wiki-img{
   width:100%;
-  max-height:160px;
+  max-height:140px;
   height:auto;
-  border-radius:8px;
+  border-radius:var(--radius-s);
   object-fit:cover;
   object-position:center top;
   display:block;
+  border:1px solid var(--off2);
 }
 .tl-img-caption{
   font-size:9px;
@@ -2010,7 +2019,10 @@ function renderTLEntries(){
 
     let bodyHtml;
     if(e.loading){
-      bodyHtml=`<div class="tl-shim"></div><div class="tl-shim" style="width:70%;margin-top:5px"></div>`;
+      bodyHtml=`<div class="tl-shim tl-shim--title"></div>
+        <div class="tl-shim" style="margin-top:10px"></div>
+        <div class="tl-shim" style="width:80%;margin-top:5px"></div>
+        <div class="tl-shim tl-shim--short" style="margin-top:5px"></div>`;
     } else if(e.text){
       const contribs = e.contributions || [];
       const COLORS = ['#007AFF','#34C759','#FF9500','#AF52DE','#FF3B30','#5AC8FA'];
@@ -2036,7 +2048,7 @@ function renderTLEntries(){
       // ── Sezione 2: contributi utente — ognuno separato con colore proprio
       let contribsHtml = '';
       if(contribs.length > 0){
-        contribsHtml = `<div class="tl-contribs-section">` +
+        contribsHtml = `<div class="tl-contribs-section"><div class="tl-contribs-label">Contributi della community</div>` +
           contribs.map((c, ci) => {
             const color = COLORS[getUserColor(c.user_id) % COLORS.length];
             const userShort = c.user_display || '👤 Utente';
@@ -2062,9 +2074,11 @@ function renderTLEntries(){
       bodyHtml='';
     }
 
-    const wikiBadge = e.wikiUsed ? `<span class="wiki-badge">📖 Wikipedia</span>` : '';
+    const srcChips = [];
+    if(e.wikiUsed) srcChips.push(`<span class="tl-source-chip">📖 Wikipedia</span>`);
+    srcChips.push(`<span class="tl-source-chip">🤖 llama3.2</span>`);
     const badge = e.isOllama && !e.loading
-      ? `<div class="ollama-badge">${wikiBadge}🤖 llama3.2</div>`
+      ? `<div class="ollama-badge">${srcChips.join('')}</div>`
       : '';
 
     // Audio player rimosso temporaneamente
