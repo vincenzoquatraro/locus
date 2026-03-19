@@ -419,9 +419,9 @@ html,body{height:100%;height:100dvh;overflow:hidden;background:var(--off);
 .tl-ln{flex:1;width:1.5px;background:var(--border);margin:2px 0;min-height:12px}
 .tl-ln.dash{background:repeating-linear-gradient(to bottom,var(--border) 0,var(--border) 4px,transparent 4px,transparent 8px)}
 .tl-b{flex:1;padding-bottom:12px}
-.tl-t{font-size:9px;color:var(--ink3);letter-spacing:.06em;text-transform:uppercase;font-weight:500;margin-bottom:4px;opacity:.65}
+.tl-t{font-size:9px;color:var(--ink3);letter-spacing:.04em;margin-bottom:2px}
 .tl-title{font-family:'DM Serif Display',serif;font-size:var(--tl-title-size);color:var(--ink);
-  line-height:1.2;margin-bottom:8px;letter-spacing:-.02em;transition:font-size .2s;font-weight:400}
+  line-height:1.25;margin-bottom:4px;letter-spacing:-.01em;transition:font-size .2s}
 .tl-txt{font-size:var(--tl-txt-size);line-height:1.65;color:var(--ink2);font-weight:300;transition:font-size .2s}
 .tl-dist{display:inline-flex;align-items:center;gap:3px;margin-top:5px;
   font-size:10px;font-weight:500;color:var(--blue);background:rgba(0,122,255,.07);
@@ -539,10 +539,8 @@ html,body{height:100%;height:100dvh;overflow:hidden;background:var(--off);
 .auth-tab.on{background:white;color:var(--ink);box-shadow:0 1px 4px rgba(0,0,0,.1)}
 #user-btn{width:30px;height:30px;border-radius:50%;border:1.5px solid var(--border);background:var(--off);display:flex;align-items:center;justify-content:center;font-size:14px;cursor:pointer;flex-shrink:0;transition:all .15s}
 #user-btn.logged-in{background:var(--ink);color:white;border-color:var(--ink)}
-.tl-flip-btn{position:absolute;top:8px;right:8px;width:28px;height:28px;border-radius:50%;border:1.5px solid var(--border);background:var(--off);display:flex;align-items:center;justify-content:center;font-size:14px;cursor:pointer;color:var(--ink2);transition:background var(--dur-fast) var(--ease-smooth),border-color var(--dur-fast) var(--ease-smooth),color var(--dur-fast) var(--ease-smooth),transform var(--dur-fast) var(--ease-spring);z-index:2}
-.tl-flip-btn::after{content:'';position:absolute;inset:-8px}
-.tl-flip-btn:hover{background:var(--ink);color:white;border-color:var(--ink)}
-.tl-flip-btn:active{background:var(--ink);color:white;border-color:var(--ink);transform:scale(.85)}
+.tl-flip-btn{position:absolute;top:8px;right:8px;width:22px;height:22px;border-radius:50%;border:1px solid var(--border);background:var(--off);display:flex;align-items:center;justify-content:center;font-size:11px;cursor:pointer;color:var(--ink3);transition:all .15s;z-index:2}
+.tl-flip-btn:active{background:var(--ink);color:white;border-color:var(--ink)}
 .tl-e-wrap{position:relative}
 .contrib-panel{display:none;background:var(--off);border-radius:10px;padding:10px 12px;margin-top:6px;flex-direction:column;gap:8px}
 .contrib-panel.vis{display:flex}
@@ -582,32 +580,14 @@ html,body{height:100%;height:100dvh;overflow:hidden;background:var(--off);
   display:flex;align-items:center;justify-content:center;cursor:pointer;
 }
 
-/* ── STORY LAYOUT — narrazione + immagine + contributi inline ── */
-.tl-story{position:relative}
-.tl-story::after{content:'';display:table;clear:both}
-.tl-img-figure{float:right;width:36%;margin:0 0 10px 12px;padding:0}
-.tl-wiki-img{width:100%;max-height:180px;border-radius:12px;object-fit:cover;object-position:center top;display:block;box-shadow:0 2px 12px rgba(0,0,0,.10)}
-.tl-img-caption{font-size:9px;color:var(--ink3);line-height:1.4;margin-top:5px;font-style:italic;text-align:center}
-.tl-contrib-para{
-  position:relative;margin:10px 0 0;padding:8px 10px 8px 36px;
-  border-radius:10px;
-  background:color-mix(in srgb, var(--contrib-color,#007AFF) 7%, white);
-  border-left:2.5px solid var(--contrib-color,#007AFF);
-  font-size:12px;color:var(--ink2);line-height:1.65;font-style:italic;
-  clear:both;
-}
-.tl-contrib-avatar{
-  position:absolute;left:8px;top:9px;
-  width:20px;height:20px;border-radius:50%;
-  color:white;font-size:10px;font-weight:700;font-style:normal;
-  display:flex;align-items:center;justify-content:center;
-  cursor:pointer;flex-shrink:0;user-select:none;
-  transition:transform .15s, box-shadow .15s;
-  box-shadow:0 1px 4px rgba(0,0,0,.2);
-}
-.tl-contrib-avatar:hover{transform:scale(1.15);box-shadow:0 2px 8px rgba(0,0,0,.25)}
-.tl-contrib-avatar:active{transform:scale(.9)}
-.contrib-inline-photo{display:block;margin-top:6px;width:100%;max-height:140px;object-fit:cover;border-radius:8px;cursor:pointer;font-style:normal}
+/* ── SEZIONE CONTRIBUTI nella card ── */
+.tl-contribs-section{margin-top:10px;display:flex;flex-direction:column;gap:8px}
+.tl-contrib-block{padding:8px 10px;border-radius:0 8px 8px 0;background:var(--off)}
+.tl-contrib-header{display:flex;align-items:center;gap:6px;margin-bottom:4px}
+.tl-contrib-user{font-size:10px;font-weight:600;letter-spacing:.02em}
+.tl-contrib-type{font-size:10px;opacity:.6;margin-left:auto}
+.tl-contrib-text{font-size:12px;color:var(--ink2);line-height:1.55}
+.contrib-inline-photo{margin-top:7px;width:100%;max-height:160px;object-fit:cover;border-radius:8px;cursor:pointer;display:block}
 
 /* ── CONTRIBUTI EVIDENZIATI — colori per utente ── */
 .contrib-highlight{
@@ -835,26 +815,21 @@ html,body{height:100%;height:100dvh;overflow:hidden;background:var(--off);
   background:rgba(255,149,0,.07);border-radius:8px;
   padding:8px 10px;margin-bottom:12px;line-height:1.5}
 
-/* Ollama badge on timeline card — contenitore dei chip fonte */
-.ollama-badge{display:flex;align-items:center;gap:5px;flex-wrap:wrap;margin-top:10px}
-/* Chip singolo fonte (Wikipedia / AI) */
-.tl-source-chip{
-  display:inline-flex;align-items:center;gap:3px;
-  font-size:9px;font-weight:500;color:var(--ink3);letter-spacing:.03em;
-  background:var(--off);border:1px solid var(--off2);
-  padding:2px 8px;border-radius:var(--radius-pill);
+/* Ollama badge on timeline card */
+.ollama-badge{
+  display:inline-flex;align-items:center;gap:5px;
+  margin-top:9px;font-size:9px;font-weight:500;color:var(--ink3);
+  background:var(--off);padding:3px 8px;border-radius:20px;
 }
 
 /* Shimmer for loading cards */
 .tl-shim{
-  height:11px;border-radius:4px;
+  height:12px;border-radius:4px;
   background:linear-gradient(90deg,var(--off) 25%,var(--off2) 50%,var(--off) 75%);
   background-size:200% 100%;
   animation:shimmer 1.4s infinite;
   width:90%;
 }
-.tl-shim--title{height:17px;width:52%;border-radius:5px}
-.tl-shim--short{width:40%}
 @keyframes shimmer{0%{background-position:-200% 0}100%{background-position:200% 0}}
 
 /* Toast notification */
@@ -951,28 +926,27 @@ html,body{height:100%;height:100dvh;overflow:hidden;background:var(--off);
   transition:background .15s;letter-spacing:.01em;
 }
 .tl-expand-btn:active{background:var(--border)}
-.wiki-badge{display:inline-flex;align-items:center;gap:3px;font-size:9px;font-weight:500;color:var(--ink3);letter-spacing:.03em}
+.wiki-badge{display:inline-block;margin-right:5px;font-size:10px;color:#636366}
+.ollama-badge{display:flex;align-items:center;gap:2px;flex-wrap:wrap;margin-top:6px}
 
 /* ── TIMELINE CARD LAYOUT ── */
-.tl-b{flex:1;padding-bottom:14px;display:flex;flex-direction:column;gap:6px}
+.tl-b{flex:1;padding-bottom:12px;display:flex;flex-direction:column;gap:4px}
 
 /* Immagine float destra — il testo la avvolge */
 .tl-img-figure{
   float:right;
-  width:34%;
-  min-width:80px;
-  margin:0 0 8px 10px;
+  width:33%;
+  margin:0 0 6px 10px;
   padding:0;
 }
 .tl-wiki-img{
   width:100%;
-  max-height:140px;
+  max-height:160px;
   height:auto;
-  border-radius:var(--radius-s);
+  border-radius:8px;
   object-fit:cover;
   object-position:center top;
   display:block;
-  border:1px solid var(--off2);
 }
 .tl-img-caption{
   font-size:9px;
@@ -1595,7 +1569,7 @@ function setPos(lat,lng){
   document.getElementById('street-banner').classList.add('vis');
   fetchStreet(lat,lng);
   // Warmup model on start
-  
+  warmupOllama();
 }
 
 // ━━━━━━━ REVERSE GEOCODING — via attuale ━━━━━━━
@@ -2006,67 +1980,78 @@ function renderTLEntries(){
 
     let bodyHtml;
     if(e.loading){
-      bodyHtml=`<div class="tl-shim tl-shim--title"></div>
-        <div class="tl-shim" style="margin-top:10px"></div>
-        <div class="tl-shim" style="width:80%;margin-top:5px"></div>
-        <div class="tl-shim tl-shim--short" style="margin-top:5px"></div>`;
+      bodyHtml=`<div class="tl-shim"></div><div class="tl-shim" style="width:70%;margin-top:5px"></div>`;
     } else if(e.text){
       const contribs = e.contributions || [];
       const COLORS = ['#007AFF','#34C759','#FF9500','#AF52DE','#FF3B30','#5AC8FA'];
-      const hasImg = !!(e.imageUrl);
 
-      // Narrazione pulita dai tag [[CONTRIB]]
+      // ── Sezione 1: narrazione principale (solo testo AI, senza contributi)
+      // Rimuovi i tag [[CONTRIB]] per la sezione narrazione pura
       const narrationOnly = e.text
         .replace(/\[\[CONTRIB:\d+\]\]([\s\S]*?)\[\[\/CONTRIB\]\]/g, '$1')
         .replace(/\[\[CONTRIB:\d+\]\]|\[\[\/CONTRIB\]\]/g, '')
         .trim();
 
-      // Immagine float right — integrata nel flusso del testo come una fiaba
-      const imgHtml = hasImg
-        ? `<figure class="tl-img-figure">
-             <img class="tl-wiki-img" src="${e.imageUrl}" alt="" loading="lazy"/>
-             ${e.imageCaption ? `<figcaption class="tl-img-caption">${e.imageCaption}</figcaption>` : ''}
-           </figure>`
-        : '';
-
-      // Contributi come paragrafi inline — stessa colonna del testo
-      const contribParas = contribs.map((c, ci) => {
-        const color = COLORS[getUserColor(c.user_id) % COLORS.length];
-        const contribsJson = encodeURIComponent(JSON.stringify(contribs));
-        const userShort = c.user_display || 'Utente';
-        const date = c.created_at
-          ? new Date(c.created_at).toLocaleDateString('it-IT',{day:'numeric',month:'short',year:'numeric'})
-          : '';
-        const photoHtml = c.photo_url
-          ? `<img class="contrib-inline-photo" src="${c.photo_url}" onclick="window.open('${c.photo_url}','_blank')" alt=""/>`
-          : '';
-        return `<p class="tl-contrib-para" style="--contrib-color:${color}" data-contribs="${contribsJson}" data-contrib-idx="${ci}">
-          <span class="tl-contrib-avatar" data-contrib-idx="${ci}" data-contribs="${contribsJson}"
-            title="${userShort}" style="background:${color}">
-            ${userShort.charAt(0).toUpperCase()}
-          </span>${c.content}${photoHtml}</p>`;
-      }).join('');
-
-      const PREVIEW_LEN = 160;
+      const PREVIEW_LEN = 120;
       const isLong = narrationOnly.length > PREVIEW_LEN;
       const preview = isLong ? narrationOnly.slice(0, PREVIEW_LEN).trimEnd() + '…' : narrationOnly;
       const contribsJson = encodeURIComponent(JSON.stringify(contribs));
       const fullEncoded  = encodeURIComponent(e.text);
 
-      const storyBlock = `<div class="tl-story" data-contribs="${contribsJson}">
-        ${imgHtml}
-        <p class="tl-txt" id="txt-${eid}">${isLong ? preview : narrationOnly}</p>
-        ${isLong ? `<button class="tl-expand-btn" id="btn-${eid}" data-id="${eid}" data-text="${fullEncoded}" data-contribs="${contribsJson}">Leggi tutto ↓</button>` : ''}
-        ${contribParas}
-      </div>`;
+      const narrationHtml = isLong
+        ? `<div class="tl-txt tl-preview" id="txt-${eid}" data-contribs="${contribsJson}">${preview}</div>
+           <button class="tl-expand-btn" id="btn-${eid}" data-id="${eid}" data-text="${fullEncoded}" data-contribs="${contribsJson}">Leggi tutto ↓</button>`
+        : `<div class="tl-txt" data-contribs="${contribsJson}">${narrationOnly}</div>`;
 
-      bodyHtml = storyBlock;
+      // ── Sezione 2: contributi utente — ognuno separato con colore proprio
+      let contribsHtml = '';
+      if(contribs.length > 0){
+        contribsHtml = `<div class="tl-contribs-section">` +
+          contribs.map((c, ci) => {
+            const color = COLORS[getUserColor(c.user_id) % COLORS.length];
+            const userShort = c.user_display || '👤 Utente';
+            const photoHtml = c.photo_url
+              ? `<img class="contrib-inline-photo" src="${c.photo_url}"
+                   onclick="window.open('${c.photo_url}','_blank')"
+                   alt="foto contributo"/>`
+              : '';
+            return `<div class="tl-contrib-block" style="border-left:3px solid ${color}">
+              <div class="tl-contrib-header" style="color:${color}">
+                <span class="tl-contrib-user">${userShort}</span>
+                <span class="tl-contrib-type">${c.type==='note'?'📝 Nota':'✏️ Correzione'}</span>
+              </div>
+              <div class="tl-contrib-text">${c.content}</div>
+              ${photoHtml}
+            </div>`;
+          }).join('') +
+        `</div>`;
+      }
+
+      bodyHtml = narrationHtml + contribsHtml;
     } else {
       bodyHtml='';
     }
 
-    const hasImg = !!(e.imageUrl && !e.loading); // usato solo per contentRow legacy
-    const contentRow = `<div class="tl-content-row">${bodyHtml}</div>`;
+    const wikiBadge = e.wikiUsed ? `<span class="wiki-badge">📖 Wikipedia</span>` : '';
+    const badge = e.isOllama && !e.loading
+      ? `<div class="ollama-badge">${wikiBadge}🤖 llama3.2</div>`
+      : '';
+
+    const hasImg = !!(e.imageUrl && !e.loading);
+    const captionHtml = (hasImg && e.imageCaption)
+      ? `<div class="tl-img-caption">${e.imageCaption}</div>` : '';
+
+    // Immagine PRIMA del testo nel DOM — float:right la sposta a destra
+    // e il testo la avvolge naturalmente
+    const contentRow = hasImg
+      ? `<div class="tl-content-row">
+           <figure class="tl-img-figure">
+             <img class="tl-wiki-img" src="${e.imageUrl}" alt="" loading="lazy"/>
+             ${captionHtml}
+           </figure>
+           ${bodyHtml}
+         </div>`
+      : `<div class="tl-content-row">${bodyHtml}</div>`;
 
     const streetId = e.streetId || '';
     const flipBtn = e.isOllama && !e.loading
@@ -2089,7 +2074,7 @@ function renderTLEntries(){
         </div>
         <!-- Foto -->
         <div class="contrib-photo-row" id="contrib-photo-row-${eid}">
-          <input type="file" accept="image/*"
+          <input type="file" accept="image/*" capture="environment"
             id="contrib-photo-input-${eid}" style="display:none"
             onchange="onPhotoSelected(this,'${eid}')"/>
           <button class="contrib-photo-btn" onclick="document.getElementById('contrib-photo-input-${eid}').click()">
@@ -2135,17 +2120,17 @@ document.addEventListener('click', function(e){
     expandTL(id, text);
   }
 
-  // Avatar contributo → popup
-  if(e.target.classList.contains('tl-contrib-avatar')){
+  // Popup contributi al click sull'highlight
+  if(e.target.classList.contains('contrib-highlight')){
     const idx = parseInt(e.target.dataset.contribIdx);
+    const contribsEl = e.target.closest('[data-contribs]');
+    if(!contribsEl) return;
     let contribs = [];
-    try { contribs = JSON.parse(decodeURIComponent(e.target.dataset.contribs||'[]')); } catch(err){}
+    try { contribs = JSON.parse(decodeURIComponent(contribsEl.dataset.contribs||'[]')); } catch(err){}
     const c = contribs[idx];
     if(!c) return;
-    const color = parseInt(e.target.style.background ? 0 : 0);
-    const COLORS = ['#007AFF','#34C759','#FF9500','#AF52DE','#FF3B30','#5AC8FA'];
-    const colorIdx = getUserColor(c.user_id);
-    showContribPopup(e, c, colorIdx);
+    const color = parseInt(e.target.dataset.color || 0);
+    showContribPopup(e, c, color);
     return;
   }
 
@@ -2199,7 +2184,7 @@ function expandTL(eid, encodedText){
   if(!txtEl || !btnEl) return;
   const fullText = decodeURIComponent(encodedText);
 
-  // Mostra narrazione pulita
+  // Mostra narrazione pulita (senza tag contrib)
   const narrationOnly = fullText
     .replace(/\[\[CONTRIB:\d+\]\]([\s\S]*?)\[\[\/CONTRIB\]\]/g, '$1')
     .replace(/\[\[CONTRIB:\d+\]\]|\[\[\/CONTRIB\]\]/g, '')
@@ -2634,26 +2619,156 @@ function cancelRoute(silent){
 
 
 // ━━━━━━━ N8N AGENT ━━━━━━━
-// Pre-warm: carica il modello llama3.2 in GPU appena si ottiene il GPS
-// così la prima narrazione è veloce invece di attendere il caricamento
-async function warmupOllama(){
-  if(!ollamaEnabled || !ollamaIP) return;
-  dbg('⏳ Warmup modello in GPU…', 'info');
-  try {
-    const r = await fetch(`${ollamaIP}/api/generate`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'ngrok-skip-browser-warning': '1' },
-      body: JSON.stringify({ model: 'llama3.2', prompt: 'ok', stream: false, options: { num_predict: 1 } }),
-      signal: AbortSignal.timeout(60000)
+const N8N_URL = 'https://domonique-procompensation-elvin.ngrok-free.dev/webhook/locus-narrate';
+
+async function callN8NAgent(streetName){
+  if(ollamaLoading) return null;
+  ollamaLoading = true;
+  dbg(`→ "${streetName}" | city:${currentCity}`, 'req');
+  try{
+    const res = await fetch(N8N_URL, {
+      method:'POST',
+      headers:{'Content-Type':'application/json','Accept':'application/json'},
+      body:JSON.stringify({street:streetName, city:currentCity, country:currentCountry}),
+      signal:AbortSignal.timeout(60000)
     });
-    if(r.ok) dbg('✓ Modello pronto in GPU', 'ok');
-  } catch(e) {
-    dbg(`warmup: ${e.message}`, 'info');
+    if(!res.ok){
+      dbg(`✗ HTTP ${res.status} — n8n non raggiungibile`,'err');
+      return null;
+    }
+    const data = await res.json();
+    dbg(`✓ risposta: success=${data.success} noData=${data.noData} src=${data.sourceUsed||'?'} chars=${data.text?.length||0}`,'ok');
+
+    // Accetta qualsiasi risposta valida con testo — success true o false
+    if(data.text){
+      return data;
+    }
+    dbg(`✗ risposta senza testo: ${JSON.stringify(data).slice(0,100)}`,'err');
+    return null;
+  }catch(e){
+    const msg = e.name==='TimeoutError' ? 'timeout 60s' : e.message;
+    dbg(`✗ fetch error: ${msg}`,'err');
+    return null;
+  }finally{
+    ollamaLoading=false;
   }
 }
 
-const N8N_URL = 'https://domonique-procompensation-elvin.ngrok-free.dev/webhook/locus-narrate';
+function toggleDbg(){
+  const body=document.getElementById('ollama-dbg-body');
+  const arrow=document.getElementById('ollama-dbg-arrow');
+  const open=body.style.display==='none';
+  body.style.display=open?'':'none';
+  arrow.textContent=open?'▾':'▸';
+  if(open) updateDbgUrl();
+}
+function updateDbgUrl(){
+  const el=document.getElementById('ollama-dbg-url');
+  if(el) el.textContent=`n8n: ${N8N_URL}`;
+}
+function applyDbgUrl(){
+  const val=document.getElementById('dbg-url-input')?.value?.trim();
+  if(!val){dbg('Inserisci un URL','err');return;}
+  window._n8nUrl=val;
+  dbg(`URL → ${val}`,'ok');
+  lastOllamaStreet='';
+  if(lastStreetName) triggerOllamaForStreet(lastStreetName);
+}
+async function testOllamaManual(){
+  updateDbgUrl();
+  dbg(`Test → ${N8N_URL}`,'req');
+  try{
+    const res=await fetch(N8N_URL,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({street:'Test',city:'Milano',country:'Italia'}),signal:AbortSignal.timeout(12000)});
+    if(res.ok){const d=await res.json();dbg(`✓ ok — success:${d.success}`,'ok');if(d.text)dbg(`"${d.text.slice(0,60)}…"`,'ok');}
+    else dbg(`✗ HTTP ${res.status}`,'err');
+  }catch(e){dbg(`✗ ${e.message}`,'err');}
+}
 
+function dbg(msg, type='info'){
+  const el=document.getElementById('ollama-dbg-log');
+  if(!el)return;
+  const now=new Date();
+  const ts=`${String(now.getHours()).padStart(2,'0')}:${String(now.getMinutes()).padStart(2,'0')}:${String(now.getSeconds()).padStart(2,'0')}`;
+  const colors={info:'#6e6e73',ok:'#30d158',err:'#ff3b30',req:'#007AFF'};
+  const line=document.createElement('div');
+  line.style.cssText=`color:${colors[type]||colors.info};padding:2px 0;border-bottom:1px solid #f0f0f0;word-break:break-all`;
+  line.textContent=`${ts} ${msg}`;
+  el.insertBefore(line,el.firstChild);
+  while(el.children.length>20) el.removeChild(el.lastChild);
+  console.log(`[n8n ${type}]`,msg);
+}
+
+async function warmupOllama(){ dbg('n8n pronto','info'); }
+
+async function triggerOllamaForStreet(streetName, quarter=''){
+  if(!streetName||streetName===lastOllamaStreet) return;
+  lastOllamaStreet=streetName;
+  dbg(`trigger: "${streetName}" | ${currentCity}`,'info');
+
+  const loadingId='ollama-'+Date.now();
+  pushTL({id:loadingId,type:'cur',emoji:'<svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24"><path fill="currentColor" d="m20.713 7.128l-.246.566a.506.506 0 0 1-.934 0l-.246-.566a4.36 4.36 0 0 0-2.22-2.25l-.759-.339a.53.53 0 0 1 0-.963l.717-.319A4.37 4.37 0 0 0 19.276.931L19.53.32a.506.506 0 0 1 .942 0l.253.61a4.37 4.37 0 0 0 2.25 2.327l.718.32a.53.53 0 0 1 0 .962l-.76.338a4.36 4.36 0 0 0-2.219 2.251M8.5 6h-2v12h2zM4 10H2v4h2zm9-8h-2v20h2zm4.5 6h-2v10h2zm4.5 2h-2v4h2z"/></svg>',title:streetName,text:null,loading:true,isOllama:true});
+
+  const result = await callN8NAgent(streetName);
+
+  if(!result){
+    tlEntries=tlEntries.map(e=>e.id===loadingId?{
+      ...e, loading:false, isOllama:true,
+      text:`⚠️ Agente non raggiungibile.\nURL: ${N8N_URL}\nCittà: ${currentCity||'non rilevata'}`
+    }:e);
+    renderTLEntries();
+    return;
+  }
+
+  if(result.noData){
+    tlEntries=tlEntries.map(e=>e.id===loadingId?{
+      ...e, loading:false, isOllama:true,
+      text: result.text,
+      streetId: result.streetId||'',
+      wikiUsed:false, imageUrl:'', imageCaption:'',
+      _noData: true
+    }:e);
+    renderTLEntries();
+    return;
+  }
+
+  if(result._ollamaFailed){
+    tlEntries=tlEntries.map(e=>e.id===loadingId?{
+      ...e, loading:false, isOllama:true,
+      text: result.text,
+      streetId: result.streetId||'',
+      wikiUsed:false, imageUrl:'', imageCaption:''
+    }:e);
+    renderTLEntries();
+    return;
+  }
+
+  tlEntries=tlEntries.map(e=>e.id===loadingId?{
+    ...e, loading:false, isOllama:true,
+    text: result.text,
+    wikiUsed: result.wikiUsed,
+    imageUrl: result.imageUrl||'',
+    imageCaption: result.imageCaption||'',
+    streetId: result.streetId||'',
+    contributions: result.contributions||[]
+  }:e);
+  renderTLEntries();
+}
+
+function startOllamaInterval(){ /* no-op */ }
+function stopOllamaInterval(){
+  if(ollamaIntervalId)clearInterval(ollamaIntervalId);
+  ollamaIntervalId=null;
+}
+
+function showOllamaToast(msg){
+  let t=document.getElementById('ollama-toast');
+  if(!t){t=document.createElement('div');t.id='ollama-toast';document.body.appendChild(t);}
+  t.textContent=msg;
+  t.className='ollama-toast vis';
+  setTimeout(()=>t.classList.remove('vis'),3500);
+}
+
+// ━━━━━━━ FOTO CONTRIBUTO ━━━━━━━
 const _photoState = {};
 let _lastOrientation = { heading: null, pitch: null, roll: null };
 window.addEventListener('deviceorientation', e => {
@@ -2681,38 +2796,6 @@ function onPhotoSelected(input, eid){
     navigator.geolocation.getCurrentPosition(p => { gps.altitude = p.coords.altitude; }, ()=>{}, { enableHighAccuracy:true, timeout:3000 });
   }
   _photoState[eid] = { file, ...gps, ...orientation };
-}
-
-// Cerca o crea la via in Supabase — usato come fallback quando n8n non restituisce streetId
-async function ensureStreet(name){
-  if(!name || !_supa) return null;
-  try {
-    // 1. cerca per street + city
-    const { data: found } = await _supa
-      .from('streets')
-      .select('id')
-      .ilike('street', name)
-      .eq('city', currentCity || '')
-      .maybeSingle();
-    if(found?.id){ dbg(`street trovata: ${found.id}`,'ok'); return found.id; }
-
-    // 2. non trovata — crea il record minimo
-    const { data: ins, error } = await _supa
-      .from('streets')
-      .insert({
-        street: name,
-        city: currentCity || '',
-        country: currentCountry || 'Italia'
-      })
-      .select('id')
-      .single();
-    if(error){ console.error('[ensureStreet insert]', error); return null; }
-    dbg(`street creata: ${ins?.id}`,'ok');
-    return ins?.id || null;
-  } catch(err){
-    console.error('[ensureStreet]', err);
-    return null;
-  }
 }
 
 async function uploadContribPhoto(eid, streetId){
@@ -3048,7 +3131,7 @@ async function submitContrib(eid, streetTitle){
 
   const panel = document.getElementById('contrib-'+eid);
   const activeTab = panel.querySelector('.contrib-tab.on')?.dataset.tab;
-  let streetId = panel.dataset.streetId;
+  const streetId = panel.dataset.streetId;
 
   console.log('[Contrib] eid:', eid, 'tab:', activeTab, 'streetId:', streetId, 'user:', currentUser?.id);
 
@@ -3059,20 +3142,10 @@ async function submitContrib(eid, streetTitle){
   sendBtn.disabled = true;
 
   try {
-    // Fallback: se streetId mancante, recupera/crea la via da Supabase
-    if(!streetId){
-      const entryTitle = document.getElementById('tl-title-'+eid)?.textContent || streetTitle;
-      if(entryTitle){
-        showOllamaToast('⏳ Recupero via…');
-        streetId = await ensureStreet(entryTitle) || '';
-        if(streetId) panel.dataset.streetId = streetId; // salva per i prossimi invii
-      }
-    }
-
     if(activeTab==='rating'){
       const score = parseInt(document.getElementById(`contrib-rating-${eid}`)?.dataset.score||0);
       if(!score){ showOllamaToast('Seleziona un voto prima'); return; }
-      if(!streetId){ showOllamaToast('Impossibile identificare la via'); return; }
+      if(!streetId){ showOllamaToast('ID via mancante — ricarica la pagina'); return; }
 
       const {data, error} = await _supa.from('ratings').upsert({
         street_id: streetId,
@@ -3087,7 +3160,7 @@ async function submitContrib(eid, streetTitle){
       const textarea = document.getElementById(`contrib-note-${eid}`);
       const text = textarea?.value?.trim();
       if(!text){ showOllamaToast('Scrivi qualcosa prima'); return; }
-      if(!streetId){ showOllamaToast('Impossibile identificare la via'); return; }
+      if(!streetId){ showOllamaToast('ID via mancante — ricarica la pagina'); return; }
 
       // Upload foto se presente
       let photoData = {};
