@@ -2067,8 +2067,9 @@ function renderTLEntries(){
       ? `<div class="ollama-badge">${wikiBadge}🤖 llama3.2</div>`
       : '';
 
-    // Audio player — usa base64 direttamente come data URL
+    // Audio player
     const hasAudio = !!(e.audioB64 && !e.loading);
+    if(hasAudio) _audioB64Store[eid] = e.audioB64; // salva in store globale
     const audioHtml = hasAudio
       ? `<div class="tl-audio-bar" id="audio-bar-${eid}">
            <button class="tl-audio-play" id="audio-play-${eid}" onclick="toggleAudio('${eid}')">▶</button>
@@ -2816,13 +2817,13 @@ function showOllamaToast(msg){
 
 // ━━━━━━━ AUDIO PLAYER ━━━━━━━
 const _audioMap = {};
+const _audioB64Store = {}; // eid → base64 string
 let _currentAudioEid = null;
 
 function _getAudioSrc(eid){
-  // Cerca il base64 nella timeline entry
-  const entry = tlEntries.find(e => (e.id||'') === eid || ('e'+tlEntries.indexOf(e)) === eid);
-  if(!entry || !entry.audioB64) return null;
-  return 'data:audio/wav;base64,' + entry.audioB64;
+  const b64 = _audioB64Store[eid];
+  if(b64) return 'data:audio/wav;base64,' + b64;
+  return null;
 }
 
 function toggleAudio(eid){
@@ -2891,6 +2892,7 @@ function seekAudio(event, eid){
 
 function autoPlayAudioIfPresent(eid, audioB64){
   if(!audioB64) return;
+  _audioB64Store[eid] = audioB64; // assicura che sia nel store
   setTimeout(() => toggleAudio(eid), 900);
 }
 const _photoState = {};
