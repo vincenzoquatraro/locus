@@ -2057,10 +2057,8 @@ function renderTLEntries(){
             <span class="tl-contrib-name" style="color:${color}">${user}</span>
             <span class="tl-contrib-date">${date}</span>
           </div>
-          <div style="display:flex; flex-direction: row">
           <p class="tl-contrib-body" style="color:${color}">${displayText}</p>
           ${photoHtml}
-          </div>
         </div>`;
       }).join('');
 
@@ -2919,12 +2917,12 @@ function showContribPopup(e, contrib, colorIdx=0){
 
   popup.querySelectorAll('.cp-photo,.cp-meta').forEach(el => el.remove());
 
-  // if(contrib.photo_url){
-  //   const img = document.createElement('img');
-  //   img.className = 'cp-photo'; img.src = contrib.photo_url; img.alt = '';
-  //   img.onclick = () => window.open(contrib.photo_url, '_blank');
-  //   popup.querySelector('.cp-user').insertAdjacentElement('afterend', img);
-  // }
+  if(contrib.photo_url){
+    const img = document.createElement('img');
+    img.className = 'cp-photo'; img.src = contrib.photo_url; img.alt = '';
+    img.onclick = () => window.open(contrib.photo_url, '_blank');
+    popup.querySelector('.cp-user').insertAdjacentElement('afterend', img);
+  }
   if(contrib.photo_lat){
     const meta = document.createElement('div');
     meta.className = 'cp-meta';
@@ -3133,39 +3131,62 @@ async function submitContrib(eid, streetTitle){
   if(!currentUser){ showOllamaToast('Accedi prima'); return; }
 
   const panel = document.getElementById('contrib-'+eid);
+  if(!panel) return;
   const activeTab = panel.querySelector('.contrib-tab.on')?.dataset.tab;
-  const streetId = panel.dataset.streetId;
+  let streetId = panel.dataset.streetId;
 
-  console.log('[Contrib] eid:', eid, 'tab:', activeTab, 'streetId:', streetId, 'user:', currentUser?.id);
-
-  // Mostra loading sul bottone
   const sendBtn = panel.querySelector('.contrib-send');
-  const origText = sendBtn.textContent;
-  sendBtn.textContent = '⏳';
-  sendBtn.disabled = true;
+  const origText = sendBtn?.textContent || 'Invia';
+  if(sendBtn){ sendBtn.textContent = '⏳'; sendBtn.disabled = true; }
 
   try {
-    if(activeTab==='rating'){
+    // Se streetId mancante → cerca o crea la via in Supabase
+    if(!streetId){
+      showOllamaToast('⏳ Identifico la via…');
+      const streetName = streetTitle || document.getElementById('tl-title-'+eid)?.textContent || lastStreetName;
+      const city = currentCity || '';
+
+      if(streetName){
+        // 1. Cerca prima
+        const { data: found } = await _supa
+          .from('streets').select('id')
+          .ilike('street', streetName).eq('city', city)
+          .maybeSingle();
+
+        if(found?.id){
+          streetId = found.id;
+        } else {
+          // 2. Crea la via con dati minimi — n8n la arricchirà al prossimo passaggio
+          const { data: ins, error: insErr } = await _supa
+            .from('streets')
+            .insert({ street: streetName, city, country: currentCountry || 'Italia' })
+            .select('id').single();
+          if(insErr){ showOllamaToast('Errore creazione via: ' + insErr.message); return; }
+          streetId = ins?.id;
+        }
+
+        if(streetId) panel.dataset.streetId = streetId;
+      }
+    }
+
+    if(!streetId){ showOllamaToast('Impossibile identificare la via'); return; }
+
+    if(activeTab === 'rating'){
       const score = parseInt(document.getElementById(`contrib-rating-${eid}`)?.dataset.score||0);
       if(!score){ showOllamaToast('Seleziona un voto prima'); return; }
-      if(!streetId){ showOllamaToast('ID via mancante — ricarica la pagina'); return; }
 
-      const {data, error} = await _supa.from('ratings').upsert({
-        street_id: streetId,
-        user_id: currentUser.id,
-        score
+      const { error } = await _supa.from('ratings').upsert({
+        street_id: streetId, user_id: currentUser.id, score
       }, { onConflict: 'street_id,user_id' });
 
-      if(error){ console.error('[Rating error]', error); showOllamaToast('Errore: ' + error.message); return; }
+      if(error){ showOllamaToast('Errore: ' + error.message); return; }
       showOllamaToast('⭐ Voto salvato!');
 
     } else {
       const textarea = document.getElementById(`contrib-note-${eid}`);
       const text = textarea?.value?.trim();
       if(!text){ showOllamaToast('Scrivi qualcosa prima'); return; }
-      if(!streetId){ showOllamaToast('ID via mancante — ricarica la pagina'); return; }
 
-      // Upload foto se presente
       let photoData = {};
       if(_photoState[eid]?.file){
         showOllamaToast('⏳ Carico foto…');
@@ -3173,7 +3194,7 @@ async function submitContrib(eid, streetTitle){
         if(uploaded) photoData = uploaded;
       }
 
-      const {data, error} = await _supa.from('contributions').insert({
+      const { error } = await _supa.from('contributions').insert({
         street_id: streetId,
         user_id: currentUser.id,
         type: activeTab || 'note',
@@ -3181,10 +3202,9 @@ async function submitContrib(eid, streetTitle){
         ...photoData
       });
 
-      if(error){ console.error('[Contribution error]', error); showOllamaToast('Errore: ' + error.message); return; }
+      if(error){ showOllamaToast('Errore: ' + error.message); return; }
       showOllamaToast('✓ Contributo inviato, grazie!');
       if(textarea) textarea.value = '';
-      // Reset foto
       _photoState[eid] = null;
       const preview = document.getElementById(`contrib-photo-preview-${eid}`);
       const photoBtn = document.querySelector(`#contrib-photo-row-${eid} .contrib-photo-btn`);
@@ -3194,13 +3214,11 @@ async function submitContrib(eid, streetTitle){
 
     panel.classList.remove('vis');
 
-
-  } catch(err) {
-    console.error('[submitContrib error]', err);
-    showOllamaToast('Errore imprevisto: ' + err.message);
+  } catch(err){
+    console.error('[submitContrib]', err);
+    showOllamaToast('Errore: ' + err.message);
   } finally {
-    sendBtn.textContent = origText;
-    sendBtn.disabled = false;
+    if(sendBtn){ sendBtn.textContent = origText; sendBtn.disabled = false; }
   }
 }
 
