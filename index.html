@@ -2977,19 +2977,23 @@ function onPhotoSelected(input, eid){
 async function ensureStreet(name){
   if(!name || !_supa) return null;
   try {
-    // 1. cerca prima per nome + città
+    // 1. cerca per street + city
     const { data: found } = await _supa
       .from('streets')
       .select('id')
-      .ilike('name', name)
+      .ilike('street', name)
       .eq('city', currentCity || '')
       .maybeSingle();
     if(found?.id){ dbg(`street trovata: ${found.id}`,'ok'); return found.id; }
 
-    // 2. non trovata — crea il record
+    // 2. non trovata — crea il record minimo
     const { data: ins, error } = await _supa
       .from('streets')
-      .insert({ name, city: currentCity || '', country: currentCountry || '' })
+      .insert({
+        street: name,
+        city: currentCity || '',
+        country: currentCountry || 'Italia'
+      })
       .select('id')
       .single();
     if(error){ console.error('[ensureStreet insert]', error); return null; }
