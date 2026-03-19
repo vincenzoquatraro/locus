@@ -1,7 +1,0 @@
-{
-  "permissions": {
-    "allow": [
-      "Bash(git -C \"c:/Users/vin261/Desktop/LOCUS_AI\" log --oneline -8)"
-    ]
-  }
-}
