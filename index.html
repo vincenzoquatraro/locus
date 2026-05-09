@@ -442,12 +442,12 @@ html,body{height:100%;height:100dvh;overflow:hidden;background:var(--off);
 .tl-txt{
   font-size:var(--tl-txt-size);line-height:1.8;
   color:var(--ink2);font-weight:400;transition:font-size .2s;
-  padding:12px 14px 14px;
+  margin-top:2px;
 }
 .tl-txt:not(.tl-txt--empty)::first-letter{
   font-family:'DM Serif Display',serif;
-  font-size:3em;font-weight:400;line-height:.78;
-  float:left;margin:3px 7px 0 0;
+  font-size:2.8em;font-weight:400;line-height:.78;
+  float:left;margin:4px 7px 0 0;
   color:var(--terra);
 }
 .tl-dist{display:inline-flex;align-items:center;gap:3px;margin-top:5px;
@@ -660,50 +660,41 @@ html,body{height:100%;height:100dvh;overflow:hidden;background:var(--off);
   display:flex;align-items:center;justify-content:center;cursor:pointer;
 }
 
-/* ── CARD BODY — storybook page ── */
-.tl-card-body{
-  position:relative;
-  background:var(--white);
-  border-radius:16px;
-  overflow:hidden;
-  border:1px solid var(--border);
-  box-shadow:0 2px 12px rgba(32,26,20,.07);
-  margin-top:2px;
-}
+/* ── CARD BODY — senza cornice, testo libero ── */
+.tl-card-body{position:relative;margin-top:4px}
 .tl-card-body::after{content:'';display:table;clear:both}
 
-/* Immagine — header full-width */
+/* Immagine — float nel testo, lato e dimensione variano per entry */
 .tl-img-figure{
-  float:none;
-  width:100%;max-width:none;
-  margin:0;padding:0;
-  border-bottom:1px solid var(--border);
+  float:right;
+  width:38%;max-width:140px;
+  margin:2px 0 10px 12px;
+  border-radius:10px;
+  overflow:hidden;
   display:block;
 }
+.tl-img-figure.fl-l{float:left;margin:2px 12px 10px 0}
+.tl-img-figure.sz-s{width:28%;max-width:100px}
+.tl-img-figure.sz-l{width:48%;max-width:160px}
 .tl-wiki-img{
   width:100%;
-  height:160px;max-height:none;
-  border-radius:0;
-  object-fit:cover;
-  object-position:center 20%;
-  display:block;
-  box-shadow:none;
+  max-height:130px;height:auto;
+  object-fit:cover;object-position:center 15%;
+  display:block;border-radius:10px;
 }
 .tl-img-caption{
-  font-size:9px;color:var(--ink3);line-height:1.4;
-  padding:5px 14px 6px;
-  font-style:italic;text-align:left;
-  border-bottom:1px solid var(--border);
+  font-size:8.5px;color:var(--ink3);line-height:1.4;
+  padding:4px 2px 0;font-style:italic;text-align:center;
 }
 
 /* Testo narrazione vuoto/no-data */
-.tl-txt--empty{font-style:italic;color:var(--ink3);padding:12px 14px}
+.tl-txt--empty{font-style:italic;color:var(--ink3)}
 
-/* Contributo — blocco editoriale (dentro la card) */
+/* Contributo — integrato nel flusso, senza separatori */
 .tl-contrib-entry{
-  padding:10px 14px 12px;
-  border-top:1px solid var(--off2);clear:both;
+  padding-top:10px;clear:both;
 }
+.tl-contrib-entry::after{content:'';display:table;clear:both}
 .tl-contrib-meta{display:flex;align-items:center;gap:8px;margin-bottom:6px}
 .tl-contrib-avatar{
   width:26px;height:26px;border-radius:50%;
@@ -724,10 +715,13 @@ html,body{height:100%;height:100dvh;overflow:hidden;background:var(--off);
   font-size:12.5px;line-height:1.65;margin:0;font-weight:400;color:var(--ink2);
 }
 .contrib-photo-block{
-  display:block;margin-top:8px;width:100%;
-  max-height:180px;object-fit:cover;
-  border-radius:12px;cursor:pointer;border:1px solid var(--border);
+  float:right;
+  width:36%;max-width:110px;max-height:110px;
+  object-fit:cover;border-radius:10px;
+  margin:2px 0 6px 8px;
+  cursor:pointer;display:block;
 }
+.contrib-photo-block.fl-l{float:left;margin:2px 8px 6px 0}
 
 /* ── CONTRIBUTI EVIDENZIATI — colori per utente ── */
 .contrib-highlight{
@@ -1060,7 +1054,7 @@ html,body{height:100%;height:100dvh;overflow:hidden;background:var(--off);
 /* ── EXPAND BTN — inline text link style ── */
 .tl-expand-btn{
   display:inline-flex;align-items:center;gap:5px;
-  margin:6px 14px 12px;
+  margin:6px 0 0;
   padding:0;border:none;background:none;
   color:var(--terra);
   font-size:12px;font-weight:600;cursor:pointer;
@@ -2132,9 +2126,12 @@ function renderTLEntries(){
       const contribsJson = encodeURIComponent(JSON.stringify(contribs));
       const fullEncoded  = encodeURIComponent(webText);
 
-      // Immagine incorniciata float right
+      // Immagine — float random left/right, dimensione variabile
+      const imgSeed = eid.charCodeAt(0) + eid.charCodeAt(eid.length-1);
+      const imgSide = imgSeed % 2 === 0 ? '' : 'fl-l';
+      const imgSize = imgSeed % 3 === 0 ? 'sz-s' : imgSeed % 3 === 1 ? '' : 'sz-l';
       const imgHtml = e.imageUrl
-        ? `<figure class="tl-img-figure">
+        ? `<figure class="tl-img-figure ${imgSide} ${imgSize}">
              <img class="tl-wiki-img" src="${e.imageUrl}" alt="" loading="lazy"/>
              ${e.imageCaption ? `<figcaption class="tl-img-caption">${e.imageCaption}</figcaption>` : ''}
            </figure>`
@@ -2156,8 +2153,9 @@ function renderTLEntries(){
           : '';
         const cJson = encodeURIComponent(JSON.stringify(contribs));
         const displayText = c.narrated_text || c.content;
+        const pSide = ci % 2 === 0 ? '' : 'fl-l';
         const photoHtml = c.photo_url
-          ? `<img class="contrib-photo-block" src="${c.photo_url}" onclick="window.open('${c.photo_url}','_blank')" alt=""/>`
+          ? `<img class="contrib-photo-block ${pSide}" src="${c.photo_url}" onclick="window.open('${c.photo_url}','_blank')" alt=""/>`
           : '';
         return `<div class="tl-contrib-entry" style="--cc:${color}">
           <div class="tl-contrib-meta">
@@ -2168,13 +2166,8 @@ function renderTLEntries(){
             <span class="tl-contrib-name" style="color:${color}">${user}</span>
             <span class="tl-contrib-date">${date}</span>
           </div>
-        <div style="display:flex; flex-direction:row; align-items:center;">
-          <p class="tl-contrib-body" style="color:${color}">${displayText}</p>
-          
-          <div style="max-width:120px; width:100%; overflow:hidden; margin-left:10px;">
-            ${photoHtml}
-          </div>
-        </div>
+          ${photoHtml}
+          <p class="tl-contrib-body">${displayText}</p>
         </div>`;
       }).join('');
 
