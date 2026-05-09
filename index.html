@@ -1063,12 +1063,31 @@ html,body{height:100%;height:100dvh;overflow:hidden;background:var(--off);
 }
 .tl-expand-btn:active{opacity:.5}
 
-/* Badge AI */
+/* Badge AI + footer row */
 .wiki-badge{display:inline-block;margin-right:4px;font-size:10px;color:var(--ink3)}
 .ollama-badge{
   display:inline-flex;align-items:center;gap:4px;
-  margin-top:8px;font-size:9px;font-weight:500;color:var(--ink3);
+  font-size:9px;font-weight:500;color:var(--ink3);
   background:var(--off);padding:3px 8px;border-radius:20px;
+}
+.tl-footer-row{display:flex;align-items:center;justify-content:space-between;margin-top:8px}
+
+/* ── TTS BUTTON ── */
+.tts-btn{
+  width:28px;height:28px;border-radius:50%;
+  border:1.5px solid var(--border);background:var(--off);
+  display:flex;align-items:center;justify-content:center;
+  cursor:pointer;flex-shrink:0;color:var(--ink2);
+  transition:all .15s var(--ease-spring);
+}
+.tts-btn:active{transform:scale(.88)}
+.tts-btn.playing{
+  background:var(--terra);border-color:var(--terra);color:white;
+  animation:ttsPulse 1.8s ease-in-out infinite;
+}
+@keyframes ttsPulse{
+  0%,100%{box-shadow:0 0 0 0 rgba(200,90,58,.4)}
+  50%{box-shadow:0 0 0 7px rgba(200,90,58,0)}
 }
 
 /* ── TIMELINE CARD LAYOUT ── */
@@ -1479,6 +1498,11 @@ let lastStreetName = '';
 let lastOllamaStreet = '';
 let ollamaIntervalId = null;
 let ollamaLoading = false;
+
+// ━━━━━━━ TTS STATE ━━━━━━━
+const synth = window.speechSynthesis || null;
+let ttsEid = null;
+if(synth){ synth.getVoices(); if('onvoiceschanged' in synth) synth.onvoiceschanged=()=>{}; }
 let currentCountry = '';
 let currentCity = '';
 
@@ -2182,7 +2206,12 @@ function renderTLEntries(){
 
     const wikiBadge = e.wikiUsed ? `<span class="wiki-badge">📖 Wikipedia</span>` : '';
     const badge = e.isOllama && !e.loading
-      ? `<div class="ollama-badge">${wikiBadge}🤖 llama3.2</div>`
+      ? `<div class="tl-footer-row">
+           <div class="ollama-badge">${wikiBadge}🤖 llama3.2</div>
+           <button class="tts-btn" data-eid="${eid}" aria-label="Ascolta narrazione">
+             <svg width="10" height="10" viewBox="0 0 10 10"><path d="M2 1l7 4-7 4V1z" fill="currentColor"/></svg>
+           </button>
+         </div>`
       : '';
 
     const contentRow = `<div class="tl-content-row">${bodyHtml}</div>`;
@@ -2263,12 +2292,78 @@ function renderTLEntries(){
   }).join('');
 }
 
+// ━━━━━━━ TTS ━━━━━━━
+function ttsGetVoice(){
+  if(!synth) return null;
+  const voices = synth.getVoices();
+  return voices.find(v=>v.lang.startsWith('it-'))
+      || voices.find(v=>v.lang.startsWith('it'))
+      || voices[0] || null;
+}
+
+function ttsStrip(html){
+  const d=document.createElement('div');
+  d.innerHTML=html;
+  return (d.textContent||d.innerText||'').replace(/\s+/g,' ').trim();
+}
+
+function ttsSplit(text){
+  return text.match(/[^.!?…]+[.!?…]+\s*/g)||[text];
+}
+
+function ttsSetState(eid,on){
+  const btn=document.querySelector(`.tts-btn[data-eid="${eid}"]`);
+  if(!btn) return;
+  btn.classList.toggle('playing',on);
+  btn.innerHTML=on
+    ?'<svg width="10" height="10" viewBox="0 0 10 10"><rect x="1" y="1" width="3" height="8" rx="1" fill="currentColor"/><rect x="6" y="1" width="3" height="8" rx="1" fill="currentColor"/></svg>'
+    :'<svg width="10" height="10" viewBox="0 0 10 10"><path d="M2 1l7 4-7 4V1z" fill="currentColor"/></svg>';
+}
+
+function ttsStop(){
+  if(synth) synth.cancel();
+  if(ttsEid){ ttsSetState(ttsEid,false); ttsEid=null; }
+}
+
+function ttsPlay(eid, rawText){
+  if(!synth){ showToast('TTS non supportato'); return; }
+  synth.cancel();
+  if(ttsEid===eid){ ttsSetState(eid,false); ttsEid=null; return; }
+  if(ttsEid) ttsSetState(ttsEid,false);
+  ttsEid=eid;
+  ttsSetState(eid,true);
+  const text=ttsStrip(rawText);
+  const chunks=ttsSplit(text);
+  let idx=0;
+  function next(){
+    if(idx>=chunks.length||ttsEid!==eid){ ttsSetState(eid,false); ttsEid=null; return; }
+    const utt=new SpeechSynthesisUtterance(chunks[idx++].trim());
+    utt.lang='it-IT'; utt.rate=0.9; utt.pitch=1.0;
+    const v=ttsGetVoice(); if(v) utt.voice=v;
+    utt.onend=next;
+    utt.onerror=()=>{ ttsSetState(eid,false); ttsEid=null; };
+    synth.speak(utt);
+  }
+  next();
+}
+
 /* CLICK HANDLER per "Leggi tutto" — evita inline onclick con caratteri speciali */
 document.addEventListener('click', function(e){
   if(e.target.classList.contains('tl-expand-btn')){
     const id = e.target.dataset.id;
     const text = e.target.dataset.text;
     expandTL(id, text);
+  }
+
+  // Pulsante TTS — play/pausa narrazione
+  const ttsEl = e.target.closest('.tts-btn');
+  if(ttsEl){
+    const eid = ttsEl.dataset.eid;
+    const titleEl = document.getElementById(`tl-title-${eid}`);
+    const txtEl   = document.getElementById(`txt-${eid}`);
+    const text = [titleEl?.innerText||'', txtEl?.innerHTML||''].filter(Boolean).join('. ');
+    if(text.trim()) ttsPlay(eid, text);
+    return;
   }
 
   // Avatar contributo → popup con data e utente
@@ -2620,6 +2715,7 @@ window.addEventListener('DOMContentLoaded', _applyNextCardVisibility);
 
 // push a new entry AT TOP of timeline with animation
 function pushTL(entry){
+  ttsStop();
   tlEntries.unshift({...entry,time:entry.time||nt()});
   renderTLEntries();
   document.getElementById('tl-scroll').scrollTo({top:0,behavior:'smooth'});
