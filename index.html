@@ -2573,61 +2573,75 @@ function initPresence(user){
   if(!_supa||presenceCh) return;
   presenceCh=_supa.channel('locus-presence-v1',{config:{presence:{key:user.id}}});
 
-  const refresh=()=>renderPresenceMarkers(presenceCh.presenceState(),user.id);
+  const refresh=()=>{
+    const state=presenceCh.presenceState();
+    console.log('[presence state]', JSON.stringify(state));
+    renderPresenceMarkers(state, user.id);
+  };
 
   presenceCh
-    .on('presence',{event:'sync'}, refresh)
-    .on('presence',{event:'join'}, refresh)   // nuovo utente → marker immediato
-    .on('presence',{event:'leave'}, refresh)  // utente esce → marker rimosso
+    .on('presence',{event:'sync'},  refresh)
+    .on('presence',{event:'join'},  refresh)
+    .on('presence',{event:'leave'}, refresh)
     .subscribe(async status=>{
+      console.log('[presence subscribe]', status);
       if(status==='SUBSCRIBED'){
         await broadcastPresence(user);
-        // Heartbeat ogni 45s — mantiene online anche chi non si muove
+        // Re-render dopo 1.5s: copre race-condition con l'altra tab
+        setTimeout(refresh, 1500);
+        // Heartbeat ogni 40s — mantiene vivo anche chi non si muove
         if(!window._presInterval){
-          window._presInterval=setInterval(()=>broadcastPresence(user), 45000);
+          window._presInterval=setInterval(async()=>{
+            await broadcastPresence(user);
+            refresh();
+          }, 40000);
         }
       }
     });
 
-  // Mostra la pillola subito, con "nessuno online"
   document.getElementById('online-pill')?.classList.add('vis');
 }
 
 async function broadcastPresence(user){
-  if(!presenceCh) return; // trasmette anche senza GPS
+  if(!presenceCh) return;
   try{
-    await presenceCh.track({
-      user_id:user.id,
-      display:(user.user_metadata?.display_name||user.email?.split('@')[0]||'?').slice(0,10),
+    const ok=await presenceCh.track({
+      uid: user.id,                // uid: campo primario per il filtro self
+      display:(user.user_metadata?.display_name||user.email?.split('@')[0]||'?').slice(0,12),
       lat:uPos?.lat??null, lng:uPos?.lng??null,
       ts:Date.now()
     });
-  }catch(e){}
+    console.log('[presence track]', ok);
+  }catch(e){ console.error('[presence track error]', e); }
 }
 
 function renderPresenceMarkers(state, selfId){
   Object.values(presenceMarkers).forEach(m=>map?.removeLayer(m));
   presenceMarkers={};
-  let total=0, onMap=0;
+  let total=0;
   const now=Date.now();
   Object.entries(state).forEach(([key,presences])=>{
+    // Filtro self: usa la CHIAVE presence (sempre = user.id) come riferimento primario
+    if(key===selfId) return;
     const p=presences?.[0];
-    if(!p||p.user_id===selfId) return;
+    if(!p) return;
+    // Doppio controllo sul campo uid nel payload (compatibilità)
+    if(p.uid===selfId||p.user_id===selfId) return;
     total++;
-    // Mostra marker solo se ha coordinate recenti (max 10 min)
-    if(!p.lat||!p.lng||now-p.ts>10*60*1000) return;
-    onMap++;
-    const color=presenceColor(p.user_id);
+    // Marker sulla mappa solo se ha coordinate recenti
+    if(!p.lat||!p.lng) return;
+    if(p.ts&&now-p.ts>15*60*1000) return; // max 15 min
+    const uid=p.uid||p.user_id||key;
+    const color=presenceColor(uid);
     const initial=(p.display||'?').charAt(0).toUpperCase();
     const marker=L.marker([p.lat,p.lng],{icon:makePresenceIcon(initial,color),zIndexOffset:500}).addTo(map);
-    marker.on('click',()=>showToast(`${p.display} · in giro adesso`));
+    marker.on('click',()=>showToast(`${p.display||'Utente'} · in giro adesso`));
     presenceMarkers[key]=marker;
   });
   const pill=document.getElementById('online-pill');
   const cnt=document.getElementById('online-count');
   pill?.classList.add('vis');
   if(cnt) cnt.textContent=total===0?'nessuno online':`${total} online`;
-  // Puntino verde se c'è qualcuno, grigio se nessuno
   const dot=pill?.querySelector('.online-dot');
   if(dot) dot.style.background=total>0?'#5b8a50':'#8a7f6b';
 }
@@ -2637,8 +2651,7 @@ function cleanupPresence(){
   if(presenceCh){ _supa?.removeChannel(presenceCh); presenceCh=null; }
   Object.values(presenceMarkers).forEach(m=>map?.removeLayer(m));
   presenceMarkers={};
-  const pill=document.getElementById('online-pill');
-  pill?.classList.remove('vis');
+  document.getElementById('online-pill')?.classList.remove('vis');
 }
 
 // ━━━━━━━ HEATMAP ━━━━━━━
@@ -4201,14 +4214,16 @@ function refresh3DPresence(){
   const now=Date.now();
  
   Object.entries(presenceCh.presenceState()).forEach(([key,presences])=>{
+    if(key===currentUser?.id) return; // skip self via chiave
     const p=presences?.[0];
     if(!p||!p.lat||!p.lng) return;
-    if(now-p.ts>5*60*1000) return;
-    if(p.user_id===currentUser?.id) return;
- 
-    const color=COLORS[p.user_id.charCodeAt(0)%COLORS.length];
+    if(p.ts&&now-p.ts>15*60*1000) return;
+    const uid=p.uid||p.user_id||key;
+    if(uid===currentUser?.id) return; // doppio check payload
+
+    const color=COLORS[uid.charCodeAt(0)%COLORS.length];
     const initial=(p.display||'?').charAt(0).toUpperCase();
- 
+
     const el=document.createElement('div');
     el.style.cssText='display:flex;flex-direction:column;align-items:center;cursor:pointer';
     el.innerHTML=`
