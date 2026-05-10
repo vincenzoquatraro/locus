@@ -795,7 +795,9 @@ html,body{height:100%;height:100dvh;overflow:hidden;background:var(--off);
   color:white;font-size:11px;font-weight:500;
   padding:5px 11px 5px 8px;border-radius:20px;
   pointer-events:none;
+  transition:opacity .3s;
 }
+#online-pill.vis{display:flex}
 .online-dot{width:6px;height:6px;border-radius:50%;background:#5b8a50;animation:pulse 2s infinite}
 
 /* ── HEATMAP BTN (mappa 2D) ── */
@@ -1386,7 +1388,7 @@ html,body{height:100%;height:100dvh;overflow:hidden;background:var(--off);
       <!-- Online users pill -->
       <div id="online-pill">
         <div class="online-dot"></div>
-        <span id="online-count">0</span>&nbsp;online
+        <span id="online-count">nessuno online</span>
       </div>
     </div>
     <div id="orbit-layer"></div>
@@ -2570,22 +2572,35 @@ function makePresenceIcon(initial, color, size=36){
 function initPresence(user){
   if(!_supa||presenceCh) return;
   presenceCh=_supa.channel('locus-presence-v1',{config:{presence:{key:user.id}}});
+
+  const refresh=()=>renderPresenceMarkers(presenceCh.presenceState(),user.id);
+
   presenceCh
-    .on('presence',{event:'sync'},()=>{
-      renderPresenceMarkers(presenceCh.presenceState(),user.id);
-    })
+    .on('presence',{event:'sync'}, refresh)
+    .on('presence',{event:'join'}, refresh)   // nuovo utente → marker immediato
+    .on('presence',{event:'leave'}, refresh)  // utente esce → marker rimosso
     .subscribe(async status=>{
-      if(status==='SUBSCRIBED') await broadcastPresence(user);
+      if(status==='SUBSCRIBED'){
+        await broadcastPresence(user);
+        // Heartbeat ogni 45s — mantiene online anche chi non si muove
+        if(!window._presInterval){
+          window._presInterval=setInterval(()=>broadcastPresence(user), 45000);
+        }
+      }
     });
+
+  // Mostra la pillola subito, con "nessuno online"
+  document.getElementById('online-pill')?.classList.add('vis');
 }
 
 async function broadcastPresence(user){
-  if(!presenceCh||!uPos) return;
+  if(!presenceCh) return; // trasmette anche senza GPS
   try{
     await presenceCh.track({
       user_id:user.id,
       display:(user.user_metadata?.display_name||user.email?.split('@')[0]||'?').slice(0,10),
-      lat:uPos.lat, lng:uPos.lng, ts:Date.now()
+      lat:uPos?.lat??null, lng:uPos?.lng??null,
+      ts:Date.now()
     });
   }catch(e){}
 }
@@ -2593,13 +2608,15 @@ async function broadcastPresence(user){
 function renderPresenceMarkers(state, selfId){
   Object.values(presenceMarkers).forEach(m=>map?.removeLayer(m));
   presenceMarkers={};
-  let count=0;
+  let total=0, onMap=0;
   const now=Date.now();
   Object.entries(state).forEach(([key,presences])=>{
     const p=presences?.[0];
-    if(!p||p.user_id===selfId||!p.lat||!p.lng) return;
-    if(now-p.ts>5*60*1000) return;
-    count++;
+    if(!p||p.user_id===selfId) return;
+    total++;
+    // Mostra marker solo se ha coordinate recenti (max 10 min)
+    if(!p.lat||!p.lng||now-p.ts>10*60*1000) return;
+    onMap++;
     const color=presenceColor(p.user_id);
     const initial=(p.display||'?').charAt(0).toUpperCase();
     const marker=L.marker([p.lat,p.lng],{icon:makePresenceIcon(initial,color),zIndexOffset:500}).addTo(map);
@@ -2608,16 +2625,20 @@ function renderPresenceMarkers(state, selfId){
   });
   const pill=document.getElementById('online-pill');
   const cnt=document.getElementById('online-count');
-  if(pill){ pill.style.display=count>0?'flex':'none'; }
-  if(cnt) cnt.textContent=count;
+  pill?.classList.add('vis');
+  if(cnt) cnt.textContent=total===0?'nessuno online':`${total} online`;
+  // Puntino verde se c'è qualcuno, grigio se nessuno
+  const dot=pill?.querySelector('.online-dot');
+  if(dot) dot.style.background=total>0?'#5b8a50':'#8a7f6b';
 }
 
 function cleanupPresence(){
+  if(window._presInterval){ clearInterval(window._presInterval); window._presInterval=null; }
   if(presenceCh){ _supa?.removeChannel(presenceCh); presenceCh=null; }
   Object.values(presenceMarkers).forEach(m=>map?.removeLayer(m));
   presenceMarkers={};
   const pill=document.getElementById('online-pill');
-  if(pill) pill.style.display='none';
+  pill?.classList.remove('vis');
 }
 
 // ━━━━━━━ HEATMAP ━━━━━━━
