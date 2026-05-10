@@ -2575,7 +2575,6 @@ function initPresence(user){
 
   const refresh=()=>{
     const state=presenceCh.presenceState();
-    console.log('[presence state]', JSON.stringify(state));
     renderPresenceMarkers(state, user.id);
   };
 
@@ -2584,20 +2583,29 @@ function initPresence(user){
     .on('presence',{event:'join'},  refresh)
     .on('presence',{event:'leave'}, refresh)
     .subscribe(async status=>{
-      console.log('[presence subscribe]', status);
       if(status==='SUBSCRIBED'){
         await broadcastPresence(user);
-        // Re-render dopo 1.5s: copre race-condition con l'altra tab
-        setTimeout(refresh, 1500);
-        // Heartbeat ogni 40s — mantiene vivo anche chi non si muove
-        if(!window._presInterval){
-          window._presInterval=setInterval(async()=>{
-            await broadcastPresence(user);
-            refresh();
-          }, 40000);
-        }
+        // Retry staggered: il sync iniziale arriva spesso incompleto dopo un refresh
+        setTimeout(refresh, 800);
+        setTimeout(refresh, 2500);
+        setTimeout(refresh, 6000);
+      }
+      // Riconnessione automatica se il canale si chiude inaspettatamente
+      if(status==='CLOSED'||status==='CHANNEL_ERROR'){
+        presenceCh=null;
+        setTimeout(()=>initPresence(user), 3000);
       }
     });
+
+  if(!window._presInterval){
+    // Heartbeat ogni 30s: ritrasmette presenza + aggiorna contatore
+    window._presInterval=setInterval(async()=>{
+      await broadcastPresence(user);
+      refresh();
+    }, 30000);
+    // Polling leggero ogni 8s: recupera stati arrivati senza eventi
+    window._presPoller=setInterval(refresh, 8000);
+  }
 
   document.getElementById('online-pill')?.classList.add('vis');
 }
@@ -2648,6 +2656,7 @@ function renderPresenceMarkers(state, selfId){
 
 function cleanupPresence(){
   if(window._presInterval){ clearInterval(window._presInterval); window._presInterval=null; }
+  if(window._presPoller){ clearInterval(window._presPoller); window._presPoller=null; }
   if(presenceCh){ _supa?.removeChannel(presenceCh); presenceCh=null; }
   Object.values(presenceMarkers).forEach(m=>map?.removeLayer(m));
   presenceMarkers={};
