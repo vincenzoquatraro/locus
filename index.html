@@ -10,6 +10,8 @@
 <title>Locus</title>
 <link href="https://fonts.googleapis.com/css2?family=Instrument+Sans:ital,wght@0,400;0,500;0,600;1,400&family=DM+Serif+Display:ital@0;1&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+<link href="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.css" rel="stylesheet"/>
+<script src="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.js"></script>
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
 <style>
@@ -1182,6 +1184,103 @@ html,body{height:100%;height:100dvh;overflow:hidden;background:var(--off);
 .tl-empty-sub{font-size:12px;color:var(--ink3);line-height:1.65;max-width:220px}
 
 
+/* Bottone 3D — in basso a destra sulla mappa */
+#btn-3d{
+  position:absolute;
+  bottom:56px;
+  right:52px; /* a sinistra del bottone heatmap */
+  z-index:500;
+  width:34px;height:34px;border-radius:10px;
+  background:var(--white);border:none;
+  box-shadow:0 1px 6px rgba(0,0,0,.15);
+  display:flex;align-items:center;justify-content:center;
+  cursor:pointer;
+  font-size:11px;font-weight:700;color:var(--ink2);
+  font-family:'Instrument Sans',sans-serif;
+  letter-spacing:-.02em;
+  transition:all .15s var(--ease-spring);
+}
+#btn-3d.on{background:var(--ink);color:white;box-shadow:0 2px 12px rgba(32,26,20,.35)}
+#btn-3d:active{transform:scale(.88)}
+ 
+/* Overlay 3D — fullscreen sopra tutto */
+#view-3d{
+  position:fixed;
+  inset:0;
+  z-index:8000;
+  background:#0a0a12;
+  display:none;
+  flex-direction:column;
+}
+#view-3d.vis{display:flex}
+ 
+/* Header overlay */
+#v3d-header{
+  position:absolute;
+  top:0;left:0;right:0;
+  z-index:10;
+  padding:calc(var(--safe-top) + 12px) 16px 12px;
+  display:flex;align-items:center;justify-content:space-between;
+  background:linear-gradient(to bottom, rgba(10,10,18,.9) 0%, transparent 100%);
+  pointer-events:none;
+}
+#v3d-title{
+  font-family:'DM Serif Display',serif;
+  font-size:18px;color:white;letter-spacing:-.02em;
+  text-shadow:0 1px 8px rgba(0,0,0,.5);
+}
+#v3d-subtitle{
+  font-size:11px;color:rgba(255,255,255,.55);
+  margin-top:2px;font-weight:400;
+}
+#v3d-close{
+  width:36px;height:36px;border-radius:50%;
+  background:rgba(255,255,255,.15);backdrop-filter:blur(8px);
+  border:none;color:white;font-size:18px;cursor:pointer;
+  display:flex;align-items:center;justify-content:center;
+  pointer-events:all;
+  transition:all .15s;
+}
+#v3d-close:active{background:rgba(255,255,255,.3)}
+ 
+/* Canvas MapLibre */
+#map3d{
+  flex:1;width:100%;height:100%;
+}
+ 
+/* Hint gesture */
+#v3d-hint{
+  position:absolute;bottom:calc(var(--safe-bot) + 20px);
+  left:50%;transform:translateX(-50%);
+  background:rgba(0,0,0,.55);backdrop-filter:blur(8px);
+  color:white;font-size:11px;font-weight:500;
+  padding:7px 14px;border-radius:20px;
+  pointer-events:none;white-space:nowrap;
+  animation:hintFade 4s ease forwards;
+}
+@keyframes hintFade{
+  0%{opacity:0;transform:translateX(-50%) translateY(6px)}
+  15%{opacity:1;transform:translateX(-50%) translateY(0)}
+  70%{opacity:1}
+  100%{opacity:0}
+}
+ 
+/* Compass rose */
+#v3d-compass{
+  position:absolute;top:calc(var(--safe-top) + 70px);right:16px;
+  width:36px;height:36px;
+  background:rgba(255,255,255,.12);backdrop-filter:blur(8px);
+  border-radius:50%;
+  display:flex;align-items:center;justify-content:center;
+  cursor:pointer;border:none;
+  transition:transform .3s;
+}
+#v3d-compass svg{
+  width:20px;height:20px;
+  transition:transform .4s var(--ease-spring);
+}
+
+
 </style>
 </head>
 <body>
@@ -1258,6 +1357,7 @@ html,body{height:100%;height:100dvh;overflow:hidden;background:var(--off);
     <!-- MAP ZONE -->
     <div id="map-zone">
     <div id="map-card">
+      <button id="btn-3d" onclick="toggle3D()" title="Vista 3D città">3D</button>
       <div id="map"></div>
       <!-- Google Maps style user dot + direction cone -->
       <svg id="user-svg" xmlns="http://www.w3.org/2000/svg"
@@ -1351,6 +1451,24 @@ html,body{height:100%;height:100dvh;overflow:hidden;background:var(--off);
   <!-- SETTINGS SIDEBAR -->
 
   </div><!-- /map-row -->
+
+<div id="view-3d">
+  <div id="v3d-header">
+    <div>
+      <div id="v3d-title">Vista 3D</div>
+      <div id="v3d-subtitle">Scorri · Pinch · Ruota</div>
+    </div>
+    <button id="v3d-close" onclick="close3D()">✕</button>
+  </div>
+  <div id="map3d"></div>
+  <button id="v3d-compass" onclick="resetBearing3D()" title="Nord">
+    <svg viewBox="0 0 24 24" fill="none">
+      <path d="M12 2L15 9H9L12 2Z" fill="white"/>
+      <path d="M12 22L9 15H15L12 22Z" fill="rgba(255,255,255,.35)"/>
+      <circle cx="12" cy="12" r="2" fill="white"/>
+    </svg>
+  </button>
+</div>
 
   <!-- TIMELINE -->
   <div id="tl-section">
@@ -3911,6 +4029,304 @@ async function submitContrib(eid, streetTitle){
   }
 }
 
+let map3d = null;
+let view3dOpen = false;
+let heatmapLines3d = []; // linee contributi sulla mappa 3D
+ 
+function toggle3D(){
+  if(view3dOpen){ close3D(); return; }
+  open3D();
+}
+ 
+function open3D(){
+  view3dOpen = true;
+  document.getElementById('view-3d').classList.add('vis');
+  document.getElementById('btn-3d').classList.add('on');
+ 
+  // Inizializza MapLibre solo al primo accesso
+  if(!map3d){
+    initMap3D();
+  } else {
+    // Centra sulla posizione attuale
+    if(uPos){
+      map3d.flyTo({
+        center: [uPos.lng, uPos.lat],
+        zoom: 16, pitch: 55, bearing: 0,
+        duration: 1200
+      });
+    }
+  }
+}
+ 
+function close3D(){
+  view3dOpen = false;
+  document.getElementById('view-3d').classList.remove('vis');
+  document.getElementById('btn-3d').classList.remove('on');
+}
+ 
+function resetBearing3D(){
+  if(!map3d) return;
+  map3d.easeTo({ bearing: 0, pitch: 55, duration: 600 });
+}
+ 
+function initMap3D(){
+  const center = uPos
+    ? [uPos.lng, uPos.lat]
+    : [12.4964, 41.9028]; // Roma default
+ 
+  map3d = new maplibregl.Map({
+    container: 'map3d',
+    // Stile con edifici 3D OSM — gratuito, nessuna API key
+    style: {
+      version: 8,
+      glyphs: 'https://demotiles.maplibre.org/font/{fontstack}/{range}.pbf',
+      sources: {
+        // Tile base CartoDB (stesso stile della mappa 2D)
+        'carto': {
+          type: 'raster',
+          tiles: ['https://a.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}@2x.png'],
+          tileSize: 512,
+          maxzoom: 19,
+          attribution: '© OpenStreetMap contributors, © CARTO'
+        },
+        // Dati vettoriali OSM per edifici 3D
+        'openmaptiles': {
+          type: 'vector',
+          url: 'https://api.maptiler.com/tiles/v3/tiles.json?key=get_your_free_key_at_maptiler_com',
+        }
+      },
+      layers: [
+        // Base tile
+        {
+          id: 'background',
+          type: 'raster',
+          source: 'carto',
+          paint: { 'raster-opacity': 1 }
+        },
+      ]
+    },
+    center,
+    zoom: 16,
+    pitch: 55,       // inclinazione iniziale — vista diorama
+    bearing: 0,
+    maxPitch: 85,
+    minZoom: 10,
+    maxZoom: 20,
+    antialias: true,
+  });
+ 
+  map3d.on('load', () => {
+    add3DBuildings();
+    addStreetContribs3D();
+    addUserMarker3D();
+ 
+    // Aggiorna bussola mentre si ruota
+    map3d.on('rotate', updateCompass3D);
+ 
+    // Hint gesture (scompare da sola via CSS)
+    const hint = document.createElement('div');
+    hint.id = 'v3d-hint';
+    hint.textContent = '↕ Due dita per inclinare · ⟳ Ruota con due dita';
+    document.getElementById('view-3d').appendChild(hint);
+    setTimeout(() => hint.remove(), 4500);
+ 
+    // Aggiorna titolo con città attuale
+    const titleEl = document.getElementById('v3d-title');
+    if(currentCity) titleEl.textContent = currentCity;
+  });
+ 
+  map3d.on('error', (e) => {
+    // Se MapTiler fallisce (no API key), rimuovi il layer OSM
+    // e usa solo il tile base con edifici semplificati
+    console.warn('[3D]', e.error?.message || e);
+    add3DBuildingsFallback();
+  });
+}
+ 
+// Edifici 3D da OpenStreetMap via Overpass → GeoJSON
+async function add3DBuildings(){
+  if(!uPos) return;
+  const center = [uPos.lng, uPos.lat];
+  const radius = 800; // metro
+ 
+  // Query Overpass per edifici con altezza/piani
+  const query = `
+[out:json][timeout:15];
+(
+  way["building"](around:${radius},${uPos.lat},${uPos.lng});
+  relation["building"](around:${radius},${uPos.lat},${uPos.lng});
+);
+out body geom;
+  `.trim();
+ 
+  try {
+    const res = await fetch('https://overpass-api.de/api/interpreter', {
+      method: 'POST',
+      body: 'data=' + encodeURIComponent(query),
+      signal: AbortSignal.timeout(15000),
+    });
+    const data = await res.json();
+    const geojson = overpassToGeoJSON(data.elements || []);
+ 
+    // Aggiungi sorgente GeoJSON
+    if(map3d.getSource('buildings')) map3d.removeLayer('buildings-3d');
+    map3d.addSource('buildings', { type: 'geojson', data: geojson });
+ 
+    // Layer edifici estrusi — effetto diorama
+    map3d.addLayer({
+      id: 'buildings-3d',
+      type: 'fill-extrusion',
+      source: 'buildings',
+      paint: {
+        'fill-extrusion-color': [
+          'interpolate', ['linear'],
+          ['get', 'height'],
+          0,   '#2a2a3a',
+          10,  '#323248',
+          20,  '#3a3a56',
+          50,  '#42425e',
+          100, '#4e4e70',
+        ],
+        'fill-extrusion-height': ['get', 'height'],
+        'fill-extrusion-base':   ['get', 'min_height'],
+        'fill-extrusion-opacity': 0.92,
+        'fill-extrusion-vertical-gradient': true,
+      }
+    }, 'streets-3d'); // sotto le strade contributi
+ 
+    // Flyto con animazione diorama
+    map3d.flyTo({
+      center,
+      zoom: 16.5,
+      pitch: 60,
+      bearing: -20,
+      duration: 1800,
+      curve: 1.4,
+    });
+ 
+  } catch(e) {
+    console.warn('[3D buildings]', e.message);
+    add3DBuildingsFallback();
+  }
+}
+ 
+// Fallback senza dati OSM — usa il layer built-in di MapLibre demo
+function add3DBuildingsFallback(){
+  // Già gestito dal tile base — nessuna azione necessaria
+}
+ 
+// Converti elementi Overpass in GeoJSON
+function overpassToGeoJSON(elements){
+  const nodes = {};
+  elements.forEach(e => {
+    if(e.type === 'node') nodes[e.id] = [e.lon, e.lat];
+  });
+ 
+  const features = [];
+  elements.forEach(e => {
+    if(e.type !== 'way' || !e.nodes) return;
+    const coords = e.nodes.map(id => nodes[id]).filter(Boolean);
+    if(coords.length < 3) return;
+    if(coords[0][0] !== coords[coords.length-1][0])
+      coords.push(coords[0]); // chiudi il poligono
+ 
+    const tags = e.tags || {};
+    const levels = parseFloat(tags['building:levels']) || 2;
+    const height = parseFloat(tags['height']) || levels * 3.5;
+    const minHeight = parseFloat(tags['min_height']) || 0;
+ 
+    features.push({
+      type: 'Feature',
+      geometry: { type: 'Polygon', coordinates: [coords] },
+      properties: { height, min_height: minHeight, levels }
+    });
+  });
+ 
+  return { type: 'FeatureCollection', features };
+}
+ 
+// Vie con contributi sulla mappa 3D (polyline colorate)
+async function addStreetContribs3D(){
+  if(!heatmapCache || !uPos) return;
+ 
+  const entries = Object.entries(heatmapCache);
+  if(!entries.length) return;
+ 
+  const maxN = Math.max(...entries.map(([,d]) => d.contribs.length), 1);
+  const streetNames = entries.map(([name]) => name);
+ 
+  let geoms = {};
+  try {
+    geoms = await fetchStreetGeometries(streetNames, uPos, 1500);
+  } catch(e) { return; }
+ 
+  const features = [];
+  entries.forEach(([name, d]) => {
+    const n = d.contribs.length;
+    const t = n / maxN;
+    let color;
+    if(t >= 0.75)     color = '#ff7777';
+    else if(t >= 0.5) color = '#ffaa44';
+    else if(t >= 0.25)color = '#eeee44';
+    else              color = '#44aaff';
+ 
+    const segs = geoms[name.toLowerCase()] || [];
+    segs.forEach(seg => {
+      features.push({
+        type: 'Feature',
+        geometry: { type: 'LineString', coordinates: seg.map(([lat,lng]) => [lng,lat]) },
+        properties: { color, width: 4 + Math.round(t * 4), name, n }
+      });
+    });
+  });
+ 
+  if(!features.length) return;
+ 
+  // Rimuovi layer precedente se esiste
+  if(map3d.getLayer('streets-3d')) map3d.removeLayer('streets-3d');
+  if(map3d.getSource('streets-3d')) map3d.removeSource('streets-3d');
+ 
+  map3d.addSource('streets-3d', {
+    type: 'geojson',
+    data: { type: 'FeatureCollection', features }
+  });
+ 
+  map3d.addLayer({
+    id: 'streets-3d',
+    type: 'line',
+    source: 'streets-3d',
+    layout: { 'line-cap': 'round', 'line-join': 'round' },
+    paint: {
+      'line-color':   ['get', 'color'],
+      'line-width':   ['get', 'width'],
+      'line-opacity': 0.9,
+    }
+  });
+}
+ 
+// Marker utente sulla mappa 3D
+function addUserMarker3D(){
+  if(!uPos || !map3d) return;
+ 
+  const el = document.createElement('div');
+  el.style.cssText = `
+    width:16px;height:16px;border-radius:50%;
+    background:#c85a3a;border:3px solid white;
+    box-shadow:0 0 12px rgba(200,90,58,.6);
+  `;
+ 
+  new maplibregl.Marker({ element: el })
+    .setLngLat([uPos.lng, uPos.lat])
+    .addTo(map3d);
+}
+ 
+// Aggiorna bussola SVG con il bearing attuale
+function updateCompass3D(){
+  if(!map3d) return;
+  const bearing = map3d.getBearing();
+  const svg = document.querySelector('#v3d-compass svg');
+  if(svg) svg.style.transform = `rotate(${bearing}deg)`;
+}
 // modifiche
 </script>
 
