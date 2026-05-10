@@ -2573,38 +2573,45 @@ function initPresence(user){
   if(!_supa||presenceCh) return;
   presenceCh=_supa.channel('locus-presence-v1',{config:{presence:{key:user.id}}});
 
-  const refresh=()=>{
+  // Refresh con diff: ri-renderizza solo se lo stato è cambiato
+  const refresh=(force=false)=>{
+    if(!presenceCh) return;
     const state=presenceCh.presenceState();
+    // Fingerprint basato su chiavi + ts di ogni utente
+    const fp=Object.entries(state).map(([k,v])=>k+':'+(v[0]?.ts??0)).sort().join('|');
+    if(!force && fp===window._presFp) return;
+    window._presFp=fp;
     renderPresenceMarkers(state, user.id);
   };
 
+  // Su join: il track() dell'altro utente arriva ~200-500ms dopo la subscribe
+  // → refresh immediato + due retry per catturare le coordinate una volta arrivate
+  const onJoin=()=>{ refresh(true); setTimeout(()=>refresh(true),600); setTimeout(()=>refresh(true),2000); };
+
   presenceCh
-    .on('presence',{event:'sync'},  refresh)
-    .on('presence',{event:'join'},  refresh)
-    .on('presence',{event:'leave'}, refresh)
+    .on('presence',{event:'sync'},  ()=>refresh(true))
+    .on('presence',{event:'join'},  onJoin)
+    .on('presence',{event:'leave'}, ()=>refresh(true))
     .subscribe(async status=>{
       if(status==='SUBSCRIBED'){
         await broadcastPresence(user);
-        // Retry staggered: il sync iniziale arriva spesso incompleto dopo un refresh
-        setTimeout(refresh, 800);
-        setTimeout(refresh, 2500);
-        setTimeout(refresh, 6000);
+        // Retry dopo subscribe: stato iniziale spesso incompleto
+        setTimeout(()=>refresh(true), 800);
+        setTimeout(()=>refresh(true), 2500);
+        setTimeout(()=>refresh(true), 6000);
       }
-      // Riconnessione automatica se il canale si chiude inaspettatamente
       if(status==='CLOSED'||status==='CHANNEL_ERROR'){
         presenceCh=null;
+        window._presFp=null;
         setTimeout(()=>initPresence(user), 3000);
       }
     });
 
   if(!window._presInterval){
-    // Heartbeat ogni 30s: ritrasmette presenza + aggiorna contatore
-    window._presInterval=setInterval(async()=>{
-      await broadcastPresence(user);
-      refresh();
-    }, 30000);
-    // Polling leggero ogni 8s: recupera stati arrivati senza eventi
-    window._presPoller=setInterval(refresh, 8000);
+    // Heartbeat ogni 30s
+    window._presInterval=setInterval(async()=>{ await broadcastPresence(user); refresh(true); }, 30000);
+    // Poller leggero ogni 3s — re-renderizza solo se lo stato è cambiato
+    window._presPoller=setInterval(()=>refresh(), 3000);
   }
 
   document.getElementById('online-pill')?.classList.add('vis');
@@ -2658,6 +2665,7 @@ function cleanupPresence(){
   if(window._presInterval){ clearInterval(window._presInterval); window._presInterval=null; }
   if(window._presPoller){ clearInterval(window._presPoller); window._presPoller=null; }
   if(presenceCh){ _supa?.removeChannel(presenceCh); presenceCh=null; }
+  window._presFp=null;
   Object.values(presenceMarkers).forEach(m=>map?.removeLayer(m));
   presenceMarkers={};
   document.getElementById('online-pill')?.classList.remove('vis');
