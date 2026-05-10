@@ -254,7 +254,8 @@ html,body{height:100%;height:100dvh;overflow:hidden;background:var(--off);
   border:none;
 }
 #map{width:100%;height:100%;}
-.leaflet-tile-container img,.leaflet-tile{filter:saturate(.6) sepia(.22) brightness(1.04) contrast(.96)}
+.leaflet-tile-container img,.leaflet-tile{filter:none}
+
 .leaflet-control-attribution{display:none!important}
 .leaflet-control-zoom{display:none!important}
 
@@ -2533,75 +2534,233 @@ async function toggleHeatmap(){
   }
 }
 
+// ━━━━━━━ HEATMAP — versione corretta ━━━━━━━
+// Sostituisce loadHeatmapData() nel tuo index.html
+
 async function loadHeatmapData(){
-  const {data:contribs,error}=await _supa
-    .from('contributions')
-    .select('street_name,user_id,user_display,content,type,created_at,photo_url')
-    .order('created_at',{ascending:false});
-  if(error) throw error;
+  // Usa la view contributions_with_user che ha user_display
+  // Se non esiste cade sul fallback con la tabella diretta
+  let contribs = [];
 
-  const {data:streets}=await _supa.from('streets').select('name,lat,lng');
-  const coordMap={};
-  (streets||[]).forEach(s=>{ if(s.lat&&s.lng) coordMap[s.name]={lat:s.lat,lng:s.lng}; });
+  try {
+    const {data, error} = await _supa
+      .from('contributions_with_user')
+      .select('id,street_id,user_id,user_display,content,type,created_at,photo_url')
+      .order('created_at', {ascending:false});
 
-  const grouped={};
-  (contribs||[]).forEach(c=>{
-    const k=c.street_name||''; if(!k) return;
-    if(!grouped[k]) grouped[k]={contribs:[],lat:null,lng:null};
-    grouped[k].contribs.push(c);
-    if(!grouped[k].lat && coordMap[k]){ grouped[k].lat=coordMap[k].lat; grouped[k].lng=coordMap[k].lng; }
-  });
+    if(error) throw error;
+    contribs = data || [];
+  } catch(e){
+    // Fallback: tabella diretta senza user_display
+    const {data, error: e2} = await _supa
+      .from('contributions')
+      .select('id,street_id,user_id,content,type,created_at,photo_url')
+      .order('created_at', {ascending:false});
+    if(e2) throw e2;
+    contribs = (data||[]).map(c => ({
+      ...c,
+      user_display: c.user_id?.slice(0,8)+'…'
+    }));
+  }
 
-  // fallback: match con places in memoria
-  Object.entries(grouped).forEach(([name,d])=>{
-    if(d.lat) return;
-    const pl=places.find(p=>p.name&&(
-      p.name.toLowerCase().includes(name.toLowerCase().replace(/^via /,''))||
-      name.toLowerCase().includes(p.name.toLowerCase().replace(/^via /,''))
-    ));
-    if(pl){ d.lat=pl.lat; d.lng=pl.lon; }
-  });
+  // Carica le strade per nome e città tramite street_id
+  const streetIds = [...new Set(contribs.map(c=>c.street_id).filter(Boolean))];
+  let streetMap = {};
 
-  heatmapCache=grouped;
-}
+  if(streetIds.length){
+    const {data:streets} = await _supa
+      .from('streets')
+      .select('id,street,city')
+      .in('id', streetIds);
+    (streets||[]).forEach(s => { streetMap[s.id] = s; });
+  }
 
-function renderHeatmap(){
-  const entries=Object.entries(heatmapCache).filter(([,d])=>d.lat&&d.lng);
-  if(!entries.length){ showToast('Nessun contributo con posizione nota'); return; }
+  // Raggruppa per street_id
+  const grouped = {};
+  contribs.forEach(c => {
+    const k = c.street_id;
+    if(!k) return;
+    const streetData = streetMap[k];
+    const streetName = streetData?.street || 'Via sconosciuta';
+    const key = streetName; // raggruppa per nome via
 
-  const maxN=Math.max(...entries.map(([,d])=>d.contribs.length),1);
+    if(!grouped[key]) grouped[key] = { contribs:[], lat:null, lng:null };
+    grouped[key].contribs.push(c);
 
-  entries.forEach(([street,d])=>{
-    const n=d.contribs.length;
-    const t=n/maxN;
-    let color,opacity;
-    if(n>=5){color='#c85a3a';opacity=0.65+t*0.25;}
-    else if(n>=2){color='#c9932a';opacity=0.45+t*0.2;}
-    else{color='#5b8a50';opacity=0.4;}
-
-    // cerchio principale
-    const r=Math.max(14, Math.min(10+n*7, 38));
-    const circle=L.circleMarker([d.lat,d.lng],{
-      radius:r, color:'transparent', fillColor:color, fillOpacity:opacity, interactive:true
-    }).addTo(map);
-    circle.on('click',()=>showHeatmapSheet(street,d.contribs));
-    heatmapLayers.push(circle);
-
-    // anello esterno per vie molto attive
-    if(n>=3){
-      const ring=L.circleMarker([d.lat,d.lng],{
-        radius:r+8, color, weight:1.5, opacity:0.28, fillOpacity:0, interactive:false
-      }).addTo(map);
-      heatmapLayers.push(ring);
+    // Cerca coordinate nei places già caricati da Overpass
+    if(!grouped[key].lat && streetData){
+      const pl = places.find(p => {
+        const pn = p.name?.toLowerCase() || '';
+        const sn = streetName.toLowerCase().replace(/^via |^piazza |^corso |^viale /i,'');
+        return pn.includes(sn) || sn.includes(pn.replace(/^via |^piazza |^corso |^viale /i,''));
+      });
+      if(pl){ grouped[key].lat = pl.lat; grouped[key].lng = pl.lon; }
+      // Fallback: posizione utente + offset basato sul nome
+      else if(uPos){
+        let hash = 0;
+        for(let i=0; i<streetName.length; i++) hash = streetName.charCodeAt(i) + ((hash<<5)-hash);
+        grouped[key].lat = uPos.lat + ((hash % 100) / 10000);
+        grouped[key].lng = uPos.lng + (((hash >> 4) % 100) / 10000);
+      }
     }
   });
 
-  try{
-    const grp=L.featureGroup(heatmapLayers.filter(l=>l.getLatLng));
-    map.flyToBounds(grp.getBounds().pad(0.2),{duration:1.2,maxZoom:16});
-  }catch(e){}
+  heatmapCache = grouped;
 }
 
+async function renderHeatmap(){
+  const entries = Object.entries(heatmapCache);
+  if(!entries.length){
+    showToast('Nessun contributo trovato');
+    return;
+  }
+ 
+  const maxN = Math.max(...entries.map(([,d]) => d.contribs.length), 1);
+ 
+  // Fetch geometria di ogni via da Overpass
+  // Raggruppiamo le query per non fare troppe chiamate
+  const streetNames = entries.map(([name]) => name);
+  const center = uPos || { lat: 41.9028, lng: 12.4964 };
+  const radius = searchRadius || 2000;
+
+  
+// Fetch geometria strade da Overpass API
+// Restituisce { 'nome via': [[[lat,lng], [lat,lng], ...], ...] }
+async function fetchStreetGeometries(streetNames, center, radius) {
+  if(!streetNames.length) return {};
+ 
+  // Costruisci query Overpass per tutte le vie
+  const nameFilters = streetNames
+    .map(n => `way["name"="${n}"](around:${radius},${center.lat},${center.lng});`)
+    .join('\n');
+ 
+  const query = `
+[out:json][timeout:15];
+(
+  ${nameFilters}
+);
+out geom;
+  `.trim();
+ 
+  const res = await fetch('https://overpass-api.de/api/interpreter', {
+    method: 'POST',
+    body: 'data=' + encodeURIComponent(query),
+    signal: AbortSignal.timeout(15000),
+  });
+ 
+  if(!res.ok) throw new Error('Overpass HTTP ' + res.status);
+  const data = await res.json();
+ 
+  // Raggruppa segmenti per nome via
+  const result = {};
+  (data.elements || []).forEach(el => {
+    if(el.type !== 'way' || !el.geometry) return;
+    const name = (el.tags?.name || '').toLowerCase();
+    if(!name) return;
+    if(!result[name]) result[name] = [];
+    // Converti geometria in array [lat,lng]
+    const coords = el.geometry.map(pt => [pt.lat, pt.lon]);
+    result[name].push(coords);
+  });
+ 
+  return result;
+}
+ 
+  showToast('Carico geometria strade…');
+ 
+  let streetGeometries = {};
+  try {
+    streetGeometries = await fetchStreetGeometries(streetNames, center, radius);
+  } catch(e) {
+    console.warn('[Heatmap] Errore geometria:', e.message);
+  }
+ 
+  // Disegna le vie colorate
+  entries.forEach(([streetName, d]) => {
+    const n = d.contribs.length;
+    const t = n / maxN;
+ 
+    // Colore per intensità — stessa palette dell'app
+    let color, weight, opacity;
+if(n >= 5)      { color='#ff7777'; weight=8;  opacity=0.9; }  // rosa
+else if(n >= 3) { color='#ffaa44'; weight=6;  opacity=0.85; } // arancio
+else if(n >= 2) { color='#eeee44'; weight=5;  opacity=0.80; } // giallo
+else            { color='#44aaff'; weight=4;  opacity=0.75; } // azzurro
+ 
+    const geom = streetGeometries[streetName.toLowerCase()];
+ 
+    if(geom && geom.length > 0) {
+      // Disegna la via come polyline
+      geom.forEach(segment => {
+        const line = L.polyline(segment, {
+          color,
+          weight,
+          opacity,
+          lineCap: 'round',
+          lineJoin: 'round',
+          interactive: true,
+        }).addTo(map);
+ 
+        line.on('click', () => showHeatmapSheet(streetName, d.contribs));
+ 
+        // Tooltip al hover
+        line.bindTooltip(`
+          <strong>${streetName}</strong><br/>
+          ${n} contribut${n===1?'o':'i'}
+        `, { sticky: true, className: 'hm-tooltip' });
+ 
+        heatmapLayers.push(line);
+      });
+    } else {
+    //   // Fallback: cerchio se non abbiamo la geometria
+    //   if(d.lat && d.lng) {
+    //     const circle = L.circleMarker([d.lat, d.lng], {
+    //       radius: Math.max(12, Math.min(8 + n * 5, 28)),
+    //       color: 'transparent',
+    //       fillColor: color,
+    //       fillOpacity: opacity,
+    //       interactive: true,
+    //     }).addTo(map);
+ 
+    //     circle.on('click', () => showHeatmapSheet(streetName, d.contribs));
+    //     circle.bindTooltip(`<strong>${streetName}</strong><br/>${n} contributi`, { sticky: true });
+    //     heatmapLayers.push(circle);
+    //   }
+    }
+  });
+ 
+  // Aggiungi stile tooltip CSS se non esiste
+  if(!document.getElementById('hm-tooltip-style')) {
+    const style = document.createElement('style');
+    style.id = 'hm-tooltip-style';
+    style.textContent = `
+      .hm-tooltip {
+        background: var(--ink);
+        color: white;
+        border: none;
+        border-radius: 8px;
+        padding: 6px 10px;
+        font-family: 'Instrument Sans', sans-serif;
+        font-size: 11px;
+        line-height: 1.5;
+        box-shadow: 0 4px 14px rgba(0,0,0,.25);
+      }
+      .hm-tooltip::before { display: none; }
+      .hm-tooltip strong { display: block; font-size: 12px; }
+    `;
+    document.head.appendChild(style);
+  }
+ 
+  // Fly to per mostrare tutte le vie
+  const allLayers = heatmapLayers.filter(l => l.getLatLng || l.getBounds);
+  if(allLayers.length) {
+    try {
+      const grp = L.featureGroup(allLayers);
+      map.flyToBounds(grp.getBounds().pad(0.25), { duration: 1.2, maxZoom: 16 });
+    } catch(e) {}
+  }
+}
+ 
 function showHeatmapSheet(streetName, contribs){
   const COLORS=['#c85a3a','#5b8a50','#c9932a','#4b7a8a','#af52de','#526b4b'];
   document.getElementById('hm-sheet-title').textContent=streetName;
