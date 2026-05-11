@@ -2631,34 +2631,50 @@ async function broadcastPresence(user){
 }
 
 function renderPresenceMarkers(state, selfId){
-  Object.values(presenceMarkers).forEach(m=>map?.removeLayer(m));
-  presenceMarkers={};
-  let total=0;
   const now=Date.now();
+  let total=0;
+  const active=new Set(); // chiavi degli utenti da tenere sulla mappa
+
   Object.entries(state).forEach(([key,presences])=>{
-    // Filtro self: usa la CHIAVE presence (sempre = user.id) come riferimento primario
     if(key===selfId) return;
     const p=presences?.[0];
     if(!p) return;
-    // Doppio controllo sul campo uid nel payload (compatibilità)
     if(p.uid===selfId||p.user_id===selfId) return;
     total++;
-    // Marker sulla mappa solo se ha coordinate recenti
+
     if(!p.lat||!p.lng) return;
-    if(p.ts&&now-p.ts>15*60*1000) return; // max 15 min
+    if(p.ts&&now-p.ts>15*60*1000) return;
+    active.add(key);
+
     const uid=p.uid||p.user_id||key;
     const color=presenceColor(uid);
     const initial=(p.display||'?').charAt(0).toUpperCase();
-    const marker=L.marker([p.lat,p.lng],{icon:makePresenceIcon(initial,color),zIndexOffset:500}).addTo(map);
-    marker.on('click',()=>showToast(`${p.display||'Utente'} · in giro adesso`));
-    presenceMarkers[key]=marker;
+
+    if(presenceMarkers[key]){
+      // Utente già in mappa: aggiorna solo posizione se si è mosso
+      presenceMarkers[key].setLatLng([p.lat,p.lng]);
+    } else {
+      // Nuovo utente: crea marker
+      const marker=L.marker([p.lat,p.lng],{icon:makePresenceIcon(initial,color),zIndexOffset:500}).addTo(map);
+      marker.on('click',()=>showToast(`${p.display||'Utente'} · in giro adesso`));
+      presenceMarkers[key]=marker;
+    }
   });
+
+  // Rimuovi solo i marker di utenti che non sono più nel canale
+  Object.keys(presenceMarkers).forEach(key=>{
+    if(!active.has(key)){ map?.removeLayer(presenceMarkers[key]); delete presenceMarkers[key]; }
+  });
+
   const pill=document.getElementById('online-pill');
   const cnt=document.getElementById('online-count');
   pill?.classList.add('vis');
   if(cnt) cnt.textContent=total===0?'nessuno online':`${total} online`;
   const dot=pill?.querySelector('.online-dot');
   if(dot) dot.style.background=total>0?'#5b8a50':'#8a7f6b';
+
+  // Aggiorna anche la mappa 3D se è aperta
+  if(view3dOpen&&map3d) refresh3DPresence();
 }
 
 function cleanupPresence(){
@@ -4222,37 +4238,53 @@ function add3DUserMarker(){
   new maplibregl.Marker({element:el,anchor:'center'}).setLngLat([uPos.lng,uPos.lat]).addTo(map3d);
 }
  
+function make3DPresenceEl(initial, color){
+  const el=document.createElement('div');
+  // pointer-events:all garantisce click; transform-style:flat lo tiene sempre verso lo schermo
+  el.style.cssText='display:flex;flex-direction:column;align-items:center;cursor:pointer;pointer-events:all';
+  el.innerHTML=`
+    <div style="width:34px;height:34px;border-radius:50%;background:${color};border:2.5px solid white;
+      display:flex;align-items:center;justify-content:center;color:white;font-size:13px;font-weight:700;
+      box-shadow:0 3px 10px rgba(0,0,0,.3);font-family:'Instrument Sans',sans-serif;
+      user-select:none">${initial}</div>
+    <div style="width:0;height:0;border-left:6px solid transparent;border-right:6px solid transparent;
+      border-top:8px solid ${color};margin-top:-1px;filter:drop-shadow(0 2px 2px rgba(0,0,0,.2))"></div>`;
+  return el;
+}
+
 function refresh3DPresence(){
   if(!map3d||!presenceCh) return;
-  Object.values(_3dMarkersPresence).forEach(m=>m.remove());
-  _3dMarkersPresence={};
- 
   const COLORS=['#c85a3a','#5b8a50','#c9932a','#4b7a8a','#af52de','#526b4b'];
   const now=Date.now();
- 
+  const active=new Set();
+
   Object.entries(presenceCh.presenceState()).forEach(([key,presences])=>{
-    if(key===currentUser?.id) return; // skip self via chiave
+    if(key===currentUser?.id) return;
     const p=presences?.[0];
     if(!p||!p.lat||!p.lng) return;
     if(p.ts&&now-p.ts>15*60*1000) return;
     const uid=p.uid||p.user_id||key;
-    if(uid===currentUser?.id) return; // doppio check payload
+    if(uid===currentUser?.id) return;
+    active.add(key);
 
     const color=COLORS[uid.charCodeAt(0)%COLORS.length];
     const initial=(p.display||'?').charAt(0).toUpperCase();
 
-    const el=document.createElement('div');
-    el.style.cssText='display:flex;flex-direction:column;align-items:center;cursor:pointer';
-    el.innerHTML=`
-      <div style="width:32px;height:32px;border-radius:50%;background:${color};border:2.5px solid white;
-        display:flex;align-items:center;justify-content:center;color:white;font-size:13px;font-weight:700;
-        box-shadow:0 2px 8px rgba(0,0,0,.25);font-family:'Instrument Sans',sans-serif">${initial}</div>
-      <div style="width:0;height:0;border-left:5px solid transparent;border-right:5px solid transparent;
-        border-top:7px solid ${color};margin-top:-1px"></div>`;
- 
-    const marker=new maplibregl.Marker({element:el,anchor:'bottom'})
-      .setLngLat([p.lng,p.lat]).addTo(map3d);
-    _3dMarkersPresence[key]=marker;
+    if(_3dMarkersPresence[key]){
+      // Aggiorna solo posizione
+      _3dMarkersPresence[key].setLngLat([p.lng,p.lat]);
+    } else {
+      // Crea nuovo marker — MapLibre Marker è sempre billboard (DOM element)
+      const el=make3DPresenceEl(initial,color);
+      el.addEventListener('click',()=>showToast(`${p.display||'Utente'} · in giro adesso`));
+      _3dMarkersPresence[key]=new maplibregl.Marker({element:el,anchor:'bottom',rotationAlignment:'viewport',pitchAlignment:'viewport'})
+        .setLngLat([p.lng,p.lat]).addTo(map3d);
+    }
+  });
+
+  // Rimuovi solo gli utenti che hanno lasciato il canale
+  Object.keys(_3dMarkersPresence).forEach(key=>{
+    if(!active.has(key)){ _3dMarkersPresence[key].remove(); delete _3dMarkersPresence[key]; }
   });
 }
 
