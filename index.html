@@ -829,6 +829,65 @@ html,body{height:100%;height:100dvh;overflow:hidden;background:var(--off);
   max-width:52px;overflow:hidden;text-overflow:ellipsis;
 }
 
+/* ━━━━━━━ PRESENCE CARD ━━━━━━━ */
+#presence-card{
+  position:fixed;
+  z-index:99990;
+  background:white;border-radius:20px;
+  padding:14px;
+  display:flex;align-items:center;gap:13px;
+  box-shadow:0 6px 32px rgba(0,0,0,.18),0 1px 6px rgba(0,0,0,.07);
+  width:260px;
+  animation:pcMorph .44s var(--ease-spring) both;
+  pointer-events:all;
+  --pc-color:#888;--pc-ox:50%;--pc-oy:50%;
+}
+#presence-card.hidden{display:none}
+@keyframes pcMorph{
+  0%  {clip-path:circle(20px at var(--pc-ox) var(--pc-oy));background:var(--pc-color)}
+  38% {clip-path:circle(20px at var(--pc-ox) var(--pc-oy));background:var(--pc-color)}
+  100%{clip-path:circle(400px at var(--pc-ox) var(--pc-oy));background:white}
+}
+#presence-card .pc-info,
+#presence-card .pc-close,
+#presence-card .pc-av{
+  animation:pcFade .22s ease .28s both;
+}
+@keyframes pcFade{from{opacity:0}to{opacity:1}}
+.pc-av{
+  width:48px;height:48px;border-radius:50%;flex-shrink:0;
+  display:flex;align-items:center;justify-content:center;
+  color:white;font-size:18px;font-weight:700;
+  font-family:'Instrument Sans',sans-serif;
+  overflow:hidden;border:2.5px solid rgba(255,255,255,.25);
+}
+.pc-info{flex:1;min-width:0}
+.pc-name{
+  font-weight:600;font-size:15px;color:var(--ink);
+  font-family:'Instrument Sans',sans-serif;
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
+}
+.pc-meta{font-size:11.5px;color:var(--ink3);margin-top:2px;font-family:'Instrument Sans',sans-serif}
+.pc-badges{display:flex;gap:4px;margin-top:6px;flex-wrap:wrap}
+.pc-badge-pill{
+  font-size:10px;padding:2px 7px;border-radius:20px;
+  background:var(--off);color:var(--ink2);
+  font-family:'Instrument Sans',sans-serif;font-weight:500;
+}
+.pc-stats{
+  font-size:11px;color:var(--ink2);margin-top:5px;
+  font-family:'Instrument Sans',sans-serif;
+  display:flex;gap:10px;
+}
+.pc-stat{display:flex;align-items:center;gap:3px}
+.pc-close{
+  width:26px;height:26px;border-radius:50%;
+  border:none;background:var(--off);
+  color:var(--ink3);font-size:16px;cursor:pointer;line-height:1;
+  display:flex;align-items:center;justify-content:center;
+  flex-shrink:0;align-self:flex-start;
+}
+
 /* ━━━━━━━ PROFILE SCREEN ━━━━━━━ */
 #profile-screen{
   position:fixed;inset:0;z-index:99998;
@@ -1407,6 +1466,18 @@ html,body{height:100%;height:100dvh;overflow:hidden;background:var(--off);
     Nessun dato condiviso con terze parti.
   </div>
 </div>
+<!-- ━━━━━━━ PRESENCE CARD ━━━━━━━ -->
+<div id="presence-card" class="hidden">
+  <div class="pc-av" id="pc-av"></div>
+  <div class="pc-info">
+    <div class="pc-name" id="pc-name"></div>
+    <div class="pc-meta" id="pc-meta"></div>
+    <div class="pc-stats" id="pc-stats"></div>
+    <div class="pc-badges" id="pc-badges"></div>
+  </div>
+  <button class="pc-close" onclick="hidePresenceCard()">×</button>
+</div>
+
 <!-- ━━━━━━━ PROFILE SCREEN ━━━━━━━ -->
 <div id="profile-screen" class="hidden">
   <div class="prof-hdr">
@@ -1909,8 +1980,8 @@ function initMap(lat,lng){
   if(map){ map.setView([lat,lng],16); return; }
   map = L.map('map',{zoomControl:false,attributionControl:false}).setView([lat,lng],16);
   L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png',{maxZoom:19}).addTo(map);
-  map.on('click', e=>onMapClick(e));
-  map.on('move zoom', ()=>{ updateCone(); renderOrbs(); updateOffscreenEdges2d(); });
+  map.on('click', e=>{ hidePresenceCard(); onMapClick(e); });
+  map.on('move zoom', ()=>{ updateCone(); renderOrbs(); updateOffscreenEdges2d(); updatePresenceCardPosition(); });
   map.on('dragstart', ()=>{
     _setFollow(false);
     if(_followReturnTimer){ clearTimeout(_followReturnTimer); _followReturnTimer=null; }
@@ -2801,7 +2872,11 @@ function updateOffscreenEdges2d() {
       const el = document.createElement('div');
       el.className = 'edge-ind';
       el.innerHTML = `<div class="edge-ind-av" style="background:${color};overflow:hidden">${avInner}</div><span class="edge-ind-name">${name}</span>`;
-      el.addEventListener('click', () => map.panTo([p.lat, p.lng]));
+      el.addEventListener('click', () => {
+        const r=el.getBoundingClientRect();
+        map.panTo([p.lat, p.lng]);
+        showPresenceCard(p,color,uid,r.left+r.width/2,r.top+r.height/2,el);
+      });
       cont.appendChild(el);
       offscreenEdge2d[key] = el;
     } else {
@@ -2856,7 +2931,11 @@ function updateOffscreenEdges3d() {
       const el = document.createElement('div');
       el.className = 'edge-ind';
       el.innerHTML = `<div class="edge-ind-av" style="background:${color};overflow:hidden">${avInner}</div><span class="edge-ind-name">${name}</span>`;
-      el.addEventListener('click', () => map3d.flyTo({center:[p.lng,p.lat], zoom:16, duration:900}));
+      el.addEventListener('click', () => {
+        const r=el.getBoundingClientRect();
+        map3d.flyTo({center:[p.lng,p.lat],zoom:16,duration:900});
+        showPresenceCard(p,color,uid,r.left+r.width/2,r.top+r.height/2,el);
+      });
       cont.appendChild(el);
       offscreenEdge3d[key] = el;
     } else {
@@ -2963,7 +3042,10 @@ function renderPresenceMarkers(state, selfId){
     } else {
       const marker=L.marker([p.lat,p.lng],{icon:makePresenceIcon(initial,color,36,avatarUrl),zIndexOffset:500}).addTo(map);
       marker._avatarUrl = avatarUrl||'';
-      marker.on('click',()=>showToast(`${p.display||'Utente'} · in giro adesso`));
+      marker.on('click',()=>{
+        const r=map.getContainer().getBoundingClientRect(),pt=map.latLngToContainerPoint([p.lat,p.lng]);
+        showPresenceCard(p,color,uid,pt.x+r.left,pt.y+r.top,marker);
+      });
       presenceMarkers[key]=marker;
     }
   });
@@ -4141,6 +4223,136 @@ function initSupabase(){
   });
 }
 
+// ━━━━━━━ PRESENCE CARD ━━━━━━━
+function hidePresenceCard(){
+  const card = document.getElementById('presence-card');
+  if(card) card.classList.add('hidden');
+  clearTimeout(window._pcTimer);
+  _pcTargetLatLng = null;
+  // Ripristina solo il cerchio (la freccia era già visibile)
+  if(_pcBubbleEl){ _pcBubbleEl.style.opacity=''; _pcBubbleEl.style.pointerEvents=''; }
+  _pcBubbleEl = null;
+  _pcSourceEl = null;
+}
+
+let _pcTargetLatLng = null;
+let _pcSourceEl = null;
+let _pcBubbleEl = null; // solo il cerchio da nascondere, freccia resta visibile
+
+function _presGetBubble(srcEl){
+  if(!srcEl) return null;
+  // Leaflet marker: bubble è .pres-bubble dentro getElement()
+  if(typeof srcEl.getElement === 'function') return srcEl.getElement()?.querySelector('.pres-bubble');
+  // Edge indicator pill: nascondi tutto (non ha freccia)
+  if(srcEl.classList?.contains('edge-ind')) return srcEl;
+  // 3D MapLibre element: firstElementChild è il cerchio, secondElementChild è il triangolo
+  return srcEl.firstElementChild || srcEl;
+}
+
+function positionPresenceCard(card, bx, by){
+  const W = window.innerWidth;
+  const cw = 260, ch = 130, pad = 10;
+  // Centro badge (il cerchio è ~19px sopra la punta del cono)
+  const cx = bx, cy = by - 19;
+  const above = (cy - ch - 14) > 56;
+  let top  = above ? cy - ch - 14 : cy + 14;
+  let left = cx - cw / 2;
+  left = Math.max(pad, Math.min(W - cw - pad, left));
+  card.style.left = left + 'px';
+  card.style.top  = top  + 'px';
+  // Clip-path origin = centro badge relativo alla card
+  card.style.setProperty('--pc-ox', (cx - left) + 'px');
+  card.style.setProperty('--pc-oy', (cy - top)  + 'px');
+}
+
+function updatePresenceCardPosition(){
+  if(!_pcTargetLatLng) return;
+  const card = document.getElementById('presence-card');
+  if(!card || card.classList.contains('hidden')) return;
+  let bx, by;
+  if(view3dOpen && map3d){
+    const pt = map3d.project([_pcTargetLatLng.lng, _pcTargetLatLng.lat]);
+    const r  = document.getElementById('map3d').getBoundingClientRect();
+    bx = pt.x + r.left; by = pt.y + r.top;
+  } else if(map){
+    const pt = map.latLngToContainerPoint([_pcTargetLatLng.lat, _pcTargetLatLng.lng]);
+    const r  = document.getElementById('map').getBoundingClientRect();
+    bx = pt.x + r.left; by = pt.y + r.top;
+  }
+  if(bx != null) positionPresenceCard(card, bx, by);
+}
+
+async function showPresenceCard(p, color, uid, sx, sy, srcEl=null){
+  const card = document.getElementById('presence-card');
+  if(!card) return;
+  clearTimeout(window._pcTimer);
+  // Ripristina cerchio precedente, poi nasconde solo il cerchio del nuovo badge
+  if(_pcBubbleEl){ _pcBubbleEl.style.opacity=''; _pcBubbleEl.style.pointerEvents=''; }
+  _pcSourceEl = srcEl;
+  _pcBubbleEl = _presGetBubble(srcEl);
+  if(_pcBubbleEl){ _pcBubbleEl.style.opacity='0'; _pcBubbleEl.style.pointerEvents='none'; }
+
+  // Avatar
+  const avEl = document.getElementById('pc-av');
+  avEl.style.background = color;
+  if(p.avatar_url){
+    avEl.innerHTML = `<img src="${p.avatar_url}" style="width:100%;height:100%;object-fit:cover" onerror="this.parentElement.textContent='${(p.display||'?')[0].toUpperCase()}'">`;
+  } else {
+    avEl.innerHTML = '';
+    avEl.textContent = (p.display||'?')[0].toUpperCase();
+  }
+
+  // Name
+  document.getElementById('pc-name').textContent = p.display || 'Utente';
+
+  // Meta: status + distanza
+  const now = Date.now();
+  const age = p.ts ? now - p.ts : 0;
+  let status = age < 90000 ? '● Online' : `Visto ${Math.round(age/60000)}min fa`;
+  if(uPos && p.lat && p.lng){
+    const d = hav(uPos.lat, uPos.lng, p.lat, p.lng);
+    status += ' · ' + fmt(d);
+  }
+  document.getElementById('pc-meta').textContent = status;
+
+  // Reset async parts
+  document.getElementById('pc-stats').innerHTML = '';
+  document.getElementById('pc-badges').innerHTML = '';
+
+  // Salva target per follow durante pan
+  _pcTargetLatLng = (p.lat && p.lng) ? {lat:p.lat, lng:p.lng} : null;
+  // Colore del badge come origine del morph
+  card.style.setProperty('--pc-color', color);
+  // Posiziona ancorata al badge e mostra con animazione morph
+  if(sx != null && sy != null) positionPresenceCard(card, sx, sy);
+  card.style.animation = 'none';
+  card.classList.remove('hidden');
+  card.offsetHeight; // force reflow
+  card.style.animation = '';
+
+  // Chiusura al tap fuori
+  clearTimeout(window._pcTimer);
+  window._pcTimer = setTimeout(hidePresenceCard, 6000);
+
+  // Fetch stats utente async
+  if(_supa && uid){
+    try{
+      const [totRes, photoRes] = await Promise.all([
+        _supa.from('contributions').select('id',{count:'exact',head:true}).eq('user_id',uid),
+        _supa.from('contributions').select('id',{count:'exact',head:true}).eq('user_id',uid).not('photo_url','is',null)
+      ]);
+      const total = totRes.count||0, photos = photoRes.count||0;
+      document.getElementById('pc-stats').innerHTML =
+        `<span class="pc-stat">📝 ${total} contribut${total===1?'o':'i'}</span>`+
+        (photos>0 ? `<span class="pc-stat">📸 ${photos} foto</span>` : '');
+      // Badge guadagnati
+      const earned = BADGE_DEFS.filter(b=>b.test({total, photos, streets:0}));
+      document.getElementById('pc-badges').innerHTML =
+        earned.map(b=>`<span class="pc-badge-pill">${b.icon} ${b.name}</span>`).join('');
+    }catch(e){ /* silent */ }
+  }
+}
+
 // ━━━━━━━ PROFILE ━━━━━━━
 const BADGE_DEFS = [
   { id:'primo_passo', name:'Primo Passo',  desc:'1 contributo',    icon:'🌱', test:(s)=>s.total>=1   },
@@ -4573,6 +4785,12 @@ async function initMap3D(){
   map3d.on('load', async () => {
     map3d.on('rotate', updateCompass3D);
     map3d.on('move zoom rotate pitch', updateOffscreenEdges3d);
+    // Follow card ogni frame in 3D (smooth anchoring)
+    map3d.on('render', ()=>{
+      if(!_pcTargetLatLng) return;
+      const card=document.getElementById('presence-card');
+      if(card&&!card.classList.contains('hidden')) updatePresenceCardPosition();
+    });
     await Promise.all([load3DBuildings(), load3DStreets()]);
     if(map3d.getLayer('streets-contrib')) document.getElementById('v3d-heat-btn')?.classList.add('on');
     update3DUserMarker();
@@ -4732,7 +4950,10 @@ function refresh3DPresence(){
       if(el.dataset.avatarUrl !== (avatarUrl||'')){
         const newEl=make3DPresenceEl(initial,color,avatarUrl);
         newEl.dataset.avatarUrl=avatarUrl||'';
-        newEl.addEventListener('click',()=>showToast(`${p.display||'Utente'} · in giro adesso`));
+        newEl.addEventListener('click',()=>{
+          const r=document.getElementById('map3d').getBoundingClientRect(),pt=map3d.project([p.lng,p.lat]);
+          showPresenceCard(p,color,uid,pt.x+r.left,pt.y+r.top,newEl);
+        });
         _3dMarkersPresence[key].remove();
         _3dMarkersPresence[key]=new maplibregl.Marker({element:newEl,anchor:'bottom',rotationAlignment:'viewport',pitchAlignment:'viewport'})
           .setLngLat([p.lng,p.lat]).addTo(map3d);
@@ -4740,7 +4961,10 @@ function refresh3DPresence(){
     } else {
       const el=make3DPresenceEl(initial,color,avatarUrl);
       el.dataset.avatarUrl=avatarUrl||'';
-      el.addEventListener('click',()=>showToast(`${p.display||'Utente'} · in giro adesso`));
+      el.addEventListener('click',()=>{
+        const r=document.getElementById('map3d').getBoundingClientRect(),pt=map3d.project([p.lng,p.lat]);
+        showPresenceCard(p,color,uid,pt.x+r.left,pt.y+r.top,el);
+      });
       _3dMarkersPresence[key]=new maplibregl.Marker({element:el,anchor:'bottom',rotationAlignment:'viewport',pitchAlignment:'viewport'})
         .setLngLat([p.lng,p.lat]).addTo(map3d);
     }
