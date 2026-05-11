@@ -800,6 +800,35 @@ html,body{height:100%;height:100dvh;overflow:hidden;background:var(--off);
 #online-pill.vis{display:flex}
 .online-dot{width:6px;height:6px;border-radius:50%;background:#5b8a50;animation:pulse 2s infinite}
 
+/* ── OFF-SCREEN PRESENCE EDGES ── */
+#presence-edges,#presence-edges-3d{
+  position:absolute;inset:0;pointer-events:none;z-index:9997;overflow:hidden;
+}
+.edge-ind{
+  position:absolute;pointer-events:all;cursor:pointer;
+  transform:translate(-50%,-50%);
+  display:flex;align-items:center;gap:4px;
+  background:rgba(30,24,18,.72);backdrop-filter:blur(6px);
+  padding:3px 8px 3px 3px;border-radius:20px;
+  box-shadow:0 2px 10px rgba(0,0,0,.25);
+  animation:edgePop .2s var(--ease-spring) both;
+  white-space:nowrap;
+}
+@keyframes edgePop{from{transform:translate(-50%,-50%) scale(.5);opacity:0}to{transform:translate(-50%,-50%) scale(1);opacity:1}}
+.edge-ind:active{transform:translate(-50%,-50%) scale(.88)}
+.edge-ind-av{
+  width:24px;height:24px;border-radius:50%;flex-shrink:0;
+  border:1.5px solid rgba(255,255,255,.75);
+  display:flex;align-items:center;justify-content:center;
+  color:white;font-size:10px;font-weight:700;
+  font-family:'Instrument Sans',sans-serif;
+}
+.edge-ind-name{
+  color:rgba(255,255,255,.9);font-size:10px;font-weight:500;
+  font-family:'Instrument Sans',sans-serif;
+  max-width:52px;overflow:hidden;text-overflow:ellipsis;
+}
+
 /* ── HEATMAP BTN (mappa 2D) ── */
 #heatmap-btn{
   position:absolute;bottom:56px;right:52px;z-index:500;
@@ -1362,6 +1391,7 @@ html,body{height:100%;height:100dvh;overflow:hidden;background:var(--off);
           <circle id="ud-pulse" r="11" fill="none" stroke="#c85a3a" stroke-opacity="0.3" stroke-width="2"/>
         </g>
       </svg>
+      <div id="presence-edges"></div>
       <div id="route-bar">
         <div class="rb-row">
           <div class="rb-dest">🏁 <span id="rb-dn">—</span></div>
@@ -1441,6 +1471,7 @@ html,body{height:100%;height:100dvh;overflow:hidden;background:var(--off);
     <button id="v3d-close" onclick="close3D()">✕</button>
   </div>
   <div id="map3d"></div>
+  <div id="presence-edges-3d"></div>
   <button id="v3d-heat-btn" onclick="toggle3DHeatmap()" title="Heatmap contributi">
     <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
       <circle cx="8" cy="8" r="2.8" fill="currentColor" opacity=".9"/>
@@ -1736,7 +1767,7 @@ function initMap(lat,lng){
   map = L.map('map',{zoomControl:false,attributionControl:false}).setView([lat,lng],16);
   L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png',{maxZoom:19}).addTo(map);
   map.on('click', e=>onMapClick(e));
-  map.on('move zoom', ()=>{ updateCone(); renderOrbs(); });
+  map.on('move zoom', ()=>{ updateCone(); renderOrbs(); updateOffscreenEdges2d(); });
   map.on('dragstart', ()=>{
     _setFollow(false);
     if(_followReturnTimer){ clearTimeout(_followReturnTimer); _followReturnTimer=null; }
@@ -1754,8 +1785,8 @@ function initMap(lat,lng){
 
 function placeUser(lat,lng){
   const ic=L.divIcon({className:'',html:'<div style="display:none"></div>',iconSize:[0,0]});
-  if(uMark){ uMark.setLatLng([lat,lng]); return; }
-  uMark=L.marker([lat,lng],{icon:ic,zIndexOffset:999}).addTo(map);
+  if(uMark){ uMark.setLatLng([lat,lng]); } else { uMark=L.marker([lat,lng],{icon:ic,zIndexOffset:999}).addTo(map); }
+  if(view3dOpen && map3d) update3DUserMarker();
 }
 
 function centerUser(){
@@ -2569,6 +2600,125 @@ function makePresenceIcon(initial, color, size=36){
   return L.divIcon({className:'',html,iconSize:[size,size+7],iconAnchor:[size/2,size+7]});
 }
 
+// ━━━━━━━ OFF-SCREEN EDGE INDICATORS ━━━━━━━
+let offscreenEdge2d = {}, offscreenEdge3d = {};
+
+function calcEdgePos(px, py, W, H, pad) {
+  const cx = W/2, cy = H/2;
+  const dx = px - cx, dy = py - cy;
+  if(!dx && !dy) return null;
+  const hw = W/2 - pad, hh = H/2 - pad;
+  const t = Math.min(
+    dx ? hw/Math.abs(dx) : Infinity,
+    dy ? hh/Math.abs(dy) : Infinity
+  );
+  return { x: cx + dx*t, y: cy + dy*t };
+}
+
+function updateOffscreenEdges2d() {
+  if(!map || !presenceCh || !currentUser) return;
+  const cont = document.getElementById('presence-edges');
+  if(!cont) return;
+  const card = document.getElementById('map-card');
+  const W = card.offsetWidth, H = card.offsetHeight;
+  const pad = 24;
+  const now = Date.now();
+  const state = presenceCh.presenceState();
+  const active = new Set();
+
+  Object.entries(state).forEach(([key, presences]) => {
+    if(key === currentUser.id) return;
+    const p = presences?.[0];
+    if(!p || !p.lat || !p.lng) return;
+    const uid = p.uid || p.user_id || key;
+    if(uid === currentUser.id) return;
+    if(p.ts && now - p.ts > 15*60*1000) return;
+
+    const pt = map.latLngToContainerPoint([p.lat, p.lng]);
+    const inView = pt.x >= pad && pt.x <= W-pad && pt.y >= pad && pt.y <= H-pad;
+    if(inView) {
+      if(offscreenEdge2d[key]) offscreenEdge2d[key].style.display = 'none';
+      return;
+    }
+
+    const edge = calcEdgePos(pt.x, pt.y, W, H, pad);
+    if(!edge) return;
+    active.add(key);
+
+    if(!offscreenEdge2d[key]) {
+      const color = presenceColor(uid);
+      const initial = (p.display||'?').charAt(0).toUpperCase();
+      const name = (p.display||'?').slice(0, 8);
+      const el = document.createElement('div');
+      el.className = 'edge-ind';
+      el.innerHTML = `<div class="edge-ind-av" style="background:${color}">${initial}</div><span class="edge-ind-name">${name}</span>`;
+      el.addEventListener('click', () => map.panTo([p.lat, p.lng]));
+      cont.appendChild(el);
+      offscreenEdge2d[key] = el;
+    } else {
+      offscreenEdge2d[key].style.display = 'flex';
+    }
+    offscreenEdge2d[key].style.left = edge.x + 'px';
+    offscreenEdge2d[key].style.top = edge.y + 'px';
+  });
+
+  Object.keys(offscreenEdge2d).forEach(key => {
+    if(!active.has(key)) { offscreenEdge2d[key].remove(); delete offscreenEdge2d[key]; }
+  });
+}
+
+function updateOffscreenEdges3d() {
+  if(!map3d || !presenceCh || !currentUser) return;
+  const cont = document.getElementById('presence-edges-3d');
+  if(!cont) return;
+  const W = cont.offsetWidth, H = cont.offsetHeight;
+  const pad = 24;
+  const now = Date.now();
+  const state = presenceCh.presenceState();
+  const COLORS = ['#c85a3a','#5b8a50','#c9932a','#4b7a8a','#af52de','#526b4b'];
+  const active = new Set();
+
+  Object.entries(state).forEach(([key, presences]) => {
+    if(key === currentUser.id) return;
+    const p = presences?.[0];
+    if(!p || !p.lat || !p.lng) return;
+    const uid = p.uid || p.user_id || key;
+    if(uid === currentUser.id) return;
+    if(p.ts && now - p.ts > 15*60*1000) return;
+
+    const pt = map3d.project([p.lng, p.lat]);
+    const inView = pt.x >= pad && pt.x <= W-pad && pt.y >= pad && pt.y <= H-pad;
+    if(inView) {
+      if(offscreenEdge3d[key]) offscreenEdge3d[key].style.display = 'none';
+      return;
+    }
+
+    const edge = calcEdgePos(pt.x, pt.y, W, H, pad);
+    if(!edge) return;
+    active.add(key);
+
+    if(!offscreenEdge3d[key]) {
+      const color = COLORS[uid.charCodeAt(0) % COLORS.length];
+      const initial = (p.display||'?').charAt(0).toUpperCase();
+      const name = (p.display||'?').slice(0, 8);
+      const el = document.createElement('div');
+      el.className = 'edge-ind';
+      el.innerHTML = `<div class="edge-ind-av" style="background:${color}">${initial}</div><span class="edge-ind-name">${name}</span>`;
+      el.addEventListener('click', () => map3d.flyTo({center:[p.lng,p.lat], zoom:16, duration:900}));
+      cont.appendChild(el);
+      offscreenEdge3d[key] = el;
+    } else {
+      offscreenEdge3d[key].style.display = 'flex';
+    }
+    offscreenEdge3d[key].style.left = edge.x + 'px';
+    offscreenEdge3d[key].style.top = edge.y + 'px';
+  });
+
+  Object.keys(offscreenEdge3d).forEach(key => {
+    if(!active.has(key)) { offscreenEdge3d[key].remove(); delete offscreenEdge3d[key]; }
+  });
+}
+
 function initPresence(user){
   if(!_supa||presenceCh) return;
   presenceCh=_supa.channel('locus-presence-v1',{config:{presence:{key:user.id}}});
@@ -2675,6 +2825,7 @@ function renderPresenceMarkers(state, selfId){
 
   // Aggiorna anche la mappa 3D se è aperta
   if(view3dOpen&&map3d) refresh3DPresence();
+  updateOffscreenEdges2d();
 }
 
 function cleanupPresence(){
@@ -2684,6 +2835,7 @@ function cleanupPresence(){
   window._presFp=null;
   Object.values(presenceMarkers).forEach(m=>map?.removeLayer(m));
   presenceMarkers={};
+  Object.values(offscreenEdge2d).forEach(el=>el.remove()); offscreenEdge2d={};
   document.getElementById('online-pill')?.classList.remove('vis');
 }
 
@@ -4066,6 +4218,7 @@ async function submitContrib(eid, streetTitle){
 let map3d = null;
 let view3dOpen = false;
 let _3dMarkersPresence = {};
+let _3dUserMarker = null;
  
 function toggle3D(){ view3dOpen ? close3D() : open3D(); }
  
@@ -4073,19 +4226,43 @@ function open3D(){
   view3dOpen = true;
   document.getElementById('view-3d').classList.add('vis');
   document.getElementById('btn-3d').classList.add('on');
+  document.getElementById('user-svg').style.visibility = 'hidden';
   if(!map3d) initMap3D();
   else {
     if(uPos) map3d.flyTo({center:[uPos.lng,uPos.lat],zoom:16,pitch:55,duration:1000});
+    update3DUserMarker();
     refresh3DPresence();
   }
 }
- 
+
 function close3D(){
   view3dOpen = false;
   document.getElementById('view-3d').classList.remove('vis');
   document.getElementById('btn-3d').classList.remove('on');
+  document.getElementById('user-svg').style.visibility = '';
+  if(_3dUserMarker){ _3dUserMarker.remove(); _3dUserMarker = null; }
+  Object.values(offscreenEdge3d).forEach(el=>el.remove()); offscreenEdge3d={};
 }
  
+function update3DUserMarker(){
+  if(!map3d || !uPos) return;
+  if(_3dUserMarker){
+    _3dUserMarker.setLngLat([uPos.lng, uPos.lat]);
+    return;
+  }
+  const el = document.createElement('div');
+  el.style.cssText = 'display:flex;flex-direction:column;align-items:center;pointer-events:none';
+  el.innerHTML = `
+    <div style="width:34px;height:34px;border-radius:50%;background:#c85a3a;border:2.5px solid white;
+      display:flex;align-items:center;justify-content:center;color:white;font-size:11px;font-weight:700;
+      box-shadow:0 3px 10px rgba(200,90,58,.5);font-family:'Instrument Sans',sans-serif;
+      user-select:none">Tu</div>
+    <div style="width:0;height:0;border-left:6px solid transparent;border-right:6px solid transparent;
+      border-top:8px solid #c85a3a;margin-top:-1px;filter:drop-shadow(0 2px 2px rgba(0,0,0,.2))"></div>`;
+  _3dUserMarker = new maplibregl.Marker({element:el, anchor:'bottom', rotationAlignment:'viewport', pitchAlignment:'viewport'})
+    .setLngLat([uPos.lng, uPos.lat]).addTo(map3d);
+}
+
 function resetBearing3D(){
   if(map3d) map3d.easeTo({bearing:0,pitch:55,duration:600});
 }
@@ -4122,8 +4299,10 @@ async function initMap3D(){
  
   map3d.on('load', async () => {
     map3d.on('rotate', updateCompass3D);
+    map3d.on('move zoom rotate pitch', updateOffscreenEdges3d);
     await Promise.all([load3DBuildings(), load3DStreets()]);
     if(map3d.getLayer('streets-contrib')) document.getElementById('v3d-heat-btn')?.classList.add('on');
+    update3DUserMarker();
     refresh3DPresence();
     map3d.flyTo({center, zoom:16.5, pitch:68, bearing:-20, duration:1800, curve:1.3});
  
@@ -4286,6 +4465,7 @@ function refresh3DPresence(){
   Object.keys(_3dMarkersPresence).forEach(key=>{
     if(!active.has(key)){ _3dMarkersPresence[key].remove(); delete _3dMarkersPresence[key]; }
   });
+  updateOffscreenEdges3d();
 }
 
 function toggle3DHeatmap(){
