@@ -829,6 +829,88 @@ html,body{height:100%;height:100dvh;overflow:hidden;background:var(--off);
   max-width:52px;overflow:hidden;text-overflow:ellipsis;
 }
 
+/* ━━━━━━━ PROFILE SCREEN ━━━━━━━ */
+#profile-screen{
+  position:fixed;inset:0;z-index:99998;
+  background:var(--off);
+  display:flex;flex-direction:column;
+  overflow-y:auto;-webkit-overflow-scrolling:touch;
+  transition:opacity .3s,transform .3s;
+}
+#profile-screen.hidden{display:none}
+#profile-screen.hiding{opacity:0;transform:translateY(24px);pointer-events:none}
+.prof-hdr{
+  display:flex;align-items:center;justify-content:space-between;
+  padding:calc(var(--safe-top) + 14px) 16px 14px;
+  background:var(--white);
+  position:sticky;top:0;z-index:2;
+  border-bottom:1px solid var(--border);
+  flex-shrink:0;
+}
+.prof-back{
+  width:36px;height:36px;border-radius:50%;border:none;
+  background:var(--off);display:flex;align-items:center;justify-content:center;
+  color:var(--ink);cursor:pointer;flex-shrink:0;
+}
+.prof-hdr-title{font-size:15px;font-weight:600;color:var(--ink)}
+.prof-body{
+  padding:28px 20px calc(var(--safe-bot) + 32px);
+  display:flex;flex-direction:column;gap:20px;
+}
+.prof-avatar-area{display:flex;flex-direction:column;align-items:center;gap:10px}
+.prof-avatar-circle{
+  width:88px;height:88px;border-radius:50%;
+  position:relative;cursor:pointer;
+  border:3px solid var(--white);
+  box-shadow:0 4px 20px rgba(0,0,0,.12);
+  overflow:hidden;background:var(--off);flex-shrink:0;
+}
+#prof-avatar-inner{width:100%;height:100%}
+.prof-avatar-edit{
+  position:absolute;bottom:0;right:0;
+  width:26px;height:26px;border-radius:50%;
+  background:var(--ink);
+  display:flex;align-items:center;justify-content:center;
+  border:2px solid var(--white);pointer-events:none;
+}
+.prof-display-name{
+  font-family:'DM Serif Display',serif;
+  font-size:20px;color:var(--ink);text-align:center;line-height:1.2;
+}
+.prof-email-lbl{font-size:13px;color:var(--ink3);text-align:center}
+.prof-section{background:var(--white);border-radius:18px;padding:18px}
+.prof-section-title{
+  font-size:11px;font-weight:600;color:var(--ink3);
+  text-transform:uppercase;letter-spacing:.07em;margin-bottom:14px;
+}
+.prof-stats-row{display:flex;gap:10px}
+.prof-stat-card{
+  flex:1;background:var(--off);border-radius:12px;
+  padding:14px 12px;text-align:center;
+}
+.prof-stat-val{
+  font-family:'DM Serif Display',serif;
+  font-size:30px;color:var(--ink);line-height:1;
+}
+.prof-stat-lbl{font-size:11px;color:var(--ink3);margin-top:5px}
+.prof-badges-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:8px}
+.badge-item{
+  display:flex;flex-direction:column;align-items:center;gap:3px;
+  padding:10px 4px;background:var(--off);border-radius:12px;
+}
+.badge-item.locked{opacity:.28;filter:grayscale(1)}
+.badge-icon{font-size:24px;line-height:1}
+.badge-name{font-size:9px;font-weight:600;color:var(--ink);text-align:center;line-height:1.3}
+.badge-desc{font-size:8px;color:var(--ink3);text-align:center;line-height:1.2}
+.prof-logout-btn{
+  width:100%;padding:14px;border-radius:var(--radius-pill);
+  border:1.5px solid var(--border);background:transparent;
+  color:var(--ink3);font-size:14px;font-weight:500;
+  cursor:pointer;font-family:'Instrument Sans',sans-serif;
+  transition:.15s;
+}
+.prof-logout-btn:active{background:var(--off)}
+
 /* ── HEATMAP BTN (mappa 2D) ── */
 #heatmap-btn{
   position:absolute;bottom:56px;right:52px;z-index:500;
@@ -1325,6 +1407,67 @@ html,body{height:100%;height:100dvh;overflow:hidden;background:var(--off);
     Nessun dato condiviso con terze parti.
   </div>
 </div>
+<!-- ━━━━━━━ PROFILE SCREEN ━━━━━━━ -->
+<div id="profile-screen" class="hidden">
+  <div class="prof-hdr">
+    <button class="prof-back" onclick="closeProfile()">
+      <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
+        <path d="M12 5L7 10L12 15" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
+      </svg>
+    </button>
+    <span class="prof-hdr-title">Profilo</span>
+    <div style="width:36px"></div>
+  </div>
+  <div class="prof-body">
+
+    <!-- Avatar + nome + email -->
+    <div class="prof-avatar-area">
+      <div class="prof-avatar-circle" onclick="document.getElementById('avatar-file').click()">
+        <div id="prof-avatar-inner"></div>
+        <div class="prof-avatar-edit">
+          <svg width="12" height="12" viewBox="0 0 14 14" fill="none">
+            <path d="M9.5 2.5L11.5 4.5L4.5 11.5H2.5V9.5L9.5 2.5Z" stroke="white" stroke-width="1.5" stroke-linejoin="round"/>
+          </svg>
+        </div>
+      </div>
+      <input type="file" id="avatar-file" accept="image/*" style="display:none" onchange="onAvatarFileChange(this)">
+      <div id="prof-display-name" class="prof-display-name"></div>
+      <div id="prof-email-lbl" class="prof-email-lbl"></div>
+    </div>
+
+    <!-- Stats -->
+    <div class="prof-section">
+      <div class="prof-section-title">Attività</div>
+      <div class="prof-stats-row">
+        <div class="prof-stat-card">
+          <div class="prof-stat-val" id="prof-stat-total">—</div>
+          <div class="prof-stat-lbl">contributi</div>
+        </div>
+        <div class="prof-stat-card">
+          <div class="prof-stat-val" id="prof-stat-photos">—</div>
+          <div class="prof-stat-lbl">foto</div>
+        </div>
+        <div class="prof-stat-card">
+          <div class="prof-stat-val" id="prof-stat-streets">—</div>
+          <div class="prof-stat-lbl">vie esplorate</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Badges -->
+    <div class="prof-section">
+      <div class="prof-section-title">Badge</div>
+      <div id="prof-badges" class="prof-badges-grid"></div>
+    </div>
+
+    <!-- Logout -->
+    <div class="prof-section" style="padding-top:0;background:transparent">
+      <button class="prof-logout-btn" onclick="doSignOut()">Esci dall'account</button>
+    </div>
+
+  </div>
+</div>
+
 <div id="app">
 
   <!-- TOPBAR -->
@@ -2592,9 +2735,12 @@ function presenceColor(userId){
   return PRES_COLORS[Math.abs(h)%PRES_COLORS.length];
 }
 
-function makePresenceIcon(initial, color, size=36){
+function makePresenceIcon(initial, color, size=36, avatarUrl=null){
+  const inner = avatarUrl
+    ? `<img src="${avatarUrl}" style="width:100%;height:100%;object-fit:cover;border-radius:50%" onerror="this.style.display='none'">`
+    : initial;
   const html=`<div class="pres-wrap">
-    <div class="pres-bubble" style="width:${size}px;height:${size}px;background:${color};font-size:${Math.round(size*.4)}px">${initial}</div>
+    <div class="pres-bubble" style="width:${size}px;height:${size}px;background:${color};font-size:${Math.round(size*.4)}px">${inner}</div>
     <div class="pres-tip" style="border-top:7px solid ${color}"></div>
   </div>`;
   return L.divIcon({className:'',html,iconSize:[size,size+7],iconAnchor:[size/2,size+7]});
@@ -2649,9 +2795,12 @@ function updateOffscreenEdges2d() {
       const color = presenceColor(uid);
       const initial = (p.display||'?').charAt(0).toUpperCase();
       const name = (p.display||'?').slice(0, 8);
+      const avInner = p.avatar_url
+        ? `<img src="${p.avatar_url}" style="width:100%;height:100%;object-fit:cover;border-radius:50%" onerror="this.parentElement.textContent='${initial}'">`
+        : initial;
       const el = document.createElement('div');
       el.className = 'edge-ind';
-      el.innerHTML = `<div class="edge-ind-av" style="background:${color}">${initial}</div><span class="edge-ind-name">${name}</span>`;
+      el.innerHTML = `<div class="edge-ind-av" style="background:${color};overflow:hidden">${avInner}</div><span class="edge-ind-name">${name}</span>`;
       el.addEventListener('click', () => map.panTo([p.lat, p.lng]));
       cont.appendChild(el);
       offscreenEdge2d[key] = el;
@@ -2701,9 +2850,12 @@ function updateOffscreenEdges3d() {
       const color = COLORS[uid.charCodeAt(0) % COLORS.length];
       const initial = (p.display||'?').charAt(0).toUpperCase();
       const name = (p.display||'?').slice(0, 8);
+      const avInner = p.avatar_url
+        ? `<img src="${p.avatar_url}" style="width:100%;height:100%;object-fit:cover;border-radius:50%" onerror="this.parentElement.textContent='${initial}'">`
+        : initial;
       const el = document.createElement('div');
       el.className = 'edge-ind';
-      el.innerHTML = `<div class="edge-ind-av" style="background:${color}">${initial}</div><span class="edge-ind-name">${name}</span>`;
+      el.innerHTML = `<div class="edge-ind-av" style="background:${color};overflow:hidden">${avInner}</div><span class="edge-ind-name">${name}</span>`;
       el.addEventListener('click', () => map3d.flyTo({center:[p.lng,p.lat], zoom:16, duration:900}));
       cont.appendChild(el);
       offscreenEdge3d[key] = el;
@@ -2771,8 +2923,9 @@ async function broadcastPresence(user){
   if(!presenceCh) return;
   try{
     const ok=await presenceCh.track({
-      uid: user.id,                // uid: campo primario per il filtro self
+      uid: user.id,
       display:(user.user_metadata?.display_name||user.email?.split('@')[0]||'?').slice(0,12),
+      avatar_url: user.user_metadata?.avatar_url || null,
       lat:uPos?.lat??null, lng:uPos?.lng??null,
       ts:Date.now()
     });
@@ -2799,13 +2952,17 @@ function renderPresenceMarkers(state, selfId){
     const uid=p.uid||p.user_id||key;
     const color=presenceColor(uid);
     const initial=(p.display||'?').charAt(0).toUpperCase();
+    const avatarUrl=p.avatar_url||null;
 
     if(presenceMarkers[key]){
-      // Utente già in mappa: aggiorna solo posizione se si è mosso
       presenceMarkers[key].setLatLng([p.lat,p.lng]);
+      if(presenceMarkers[key]._avatarUrl !== (avatarUrl||'')){
+        presenceMarkers[key].setIcon(makePresenceIcon(initial,color,36,avatarUrl));
+        presenceMarkers[key]._avatarUrl = avatarUrl||'';
+      }
     } else {
-      // Nuovo utente: crea marker
-      const marker=L.marker([p.lat,p.lng],{icon:makePresenceIcon(initial,color),zIndexOffset:500}).addTo(map);
+      const marker=L.marker([p.lat,p.lng],{icon:makePresenceIcon(initial,color,36,avatarUrl),zIndexOffset:500}).addTo(map);
+      marker._avatarUrl = avatarUrl||'';
       marker.on('click',()=>showToast(`${p.display||'Utente'} · in giro adesso`));
       presenceMarkers[key]=marker;
     }
@@ -3984,6 +4141,112 @@ function initSupabase(){
   });
 }
 
+// ━━━━━━━ PROFILE ━━━━━━━
+const BADGE_DEFS = [
+  { id:'primo_passo', name:'Primo Passo',  desc:'1 contributo',    icon:'🌱', test:(s)=>s.total>=1   },
+  { id:'osservatore', name:'Osservatore',  desc:'5 contributi',   icon:'👁️', test:(s)=>s.total>=5   },
+  { id:'cronista',    name:'Cronista',     desc:'15 contributi',  icon:'📝', test:(s)=>s.total>=15  },
+  { id:'storico',     name:'Storico',      desc:'30 contributi',  icon:'🏛️', test:(s)=>s.total>=30  },
+  { id:'cartografo',  name:'Cartografo',   desc:'50 contributi',  icon:'🗺️', test:(s)=>s.total>=50  },
+  { id:'fotografo',   name:'Fotografo',    desc:'1 foto',         icon:'📸', test:(s)=>s.photos>=1  },
+  { id:'leggenda',    name:'Leggenda',     desc:'100 contributi', icon:'⭐', test:(s)=>s.total>=100 },
+  { id:'esploratore', name:'Esploratore',  desc:'10 vie esplorate',icon:'🗺️',test:(s)=>s.streets>=10},
+];
+
+function openProfile(){
+  if(!currentUser) return;
+  const scr = document.getElementById('profile-screen');
+  scr.classList.remove('hidden','hiding');
+  // Popola dati statici
+  const name = currentUser.user_metadata?.display_name || currentUser.email?.split('@')[0] || '?';
+  document.getElementById('prof-display-name').textContent = name;
+  document.getElementById('prof-email-lbl').textContent = currentUser.email || '';
+  renderProfileAvatar();
+  loadProfileStats();
+}
+
+function closeProfile(){
+  const scr = document.getElementById('profile-screen');
+  scr.classList.add('hiding');
+  setTimeout(()=>scr.classList.add('hidden'), 300);
+}
+
+function renderProfileAvatar(){
+  const inner = document.getElementById('prof-avatar-inner');
+  if(!inner || !currentUser) return;
+  const avatarUrl = currentUser.user_metadata?.avatar_url;
+  if(avatarUrl){
+    inner.style.cssText = `width:100%;height:100%;background:url(${JSON.stringify(avatarUrl)}) center/cover no-repeat;border-radius:50%`;
+    inner.textContent = '';
+  } else {
+    const initial = (currentUser.user_metadata?.display_name || currentUser.email || '?')[0].toUpperCase();
+    const color = presenceColor(currentUser.id);
+    inner.style.cssText = `width:100%;height:100%;background:${color};border-radius:50%;display:flex;align-items:center;justify-content:center;color:white;font-size:30px;font-weight:700;font-family:'Instrument Sans',sans-serif`;
+    inner.textContent = initial;
+  }
+}
+
+async function loadProfileStats(){
+  if(!_supa || !currentUser) return;
+  try{
+    const [totRes, photoRes, streetRes] = await Promise.all([
+      _supa.from('contributions').select('id',{count:'exact',head:true}).eq('user_id',currentUser.id),
+      _supa.from('contributions').select('id',{count:'exact',head:true}).eq('user_id',currentUser.id).not('photo_url','is',null),
+      _supa.from('contributions').select('street_id').eq('user_id',currentUser.id)
+    ]);
+    const total   = totRes.count   || 0;
+    const photos  = photoRes.count || 0;
+    const streets = new Set((streetRes.data||[]).map(r=>r.street_id)).size;
+    document.getElementById('prof-stat-total').textContent   = total;
+    document.getElementById('prof-stat-photos').textContent  = photos;
+    document.getElementById('prof-stat-streets').textContent = streets;
+    renderBadges({total, photos, streets});
+  }catch(e){ console.error('[profile stats]', e); }
+}
+
+function renderBadges(stats){
+  const cont = document.getElementById('prof-badges');
+  if(!cont) return;
+  cont.innerHTML = BADGE_DEFS.map(b=>{
+    const earned = b.test(stats);
+    return `<div class="badge-item${earned?'':' locked'}">
+      <div class="badge-icon">${b.icon}</div>
+      <div class="badge-name">${b.name}</div>
+      <div class="badge-desc">${b.desc}</div>
+    </div>`;
+  }).join('');
+}
+
+async function onAvatarFileChange(input){
+  const file = input.files?.[0];
+  if(!file || !currentUser) return;
+  input.value = '';
+  showToast('Caricamento foto…');
+  try{
+    const ext = file.name.split('.').pop()||'jpg';
+    const path = `avatars/${currentUser.id}.${ext}`;
+    const { error: upErr } = await _supa.storage.from('avatars').upload(path, file, {contentType:file.type, upsert:true});
+    if(upErr) throw upErr;
+    const { data: urlData } = _supa.storage.from('avatars').getPublicUrl(path);
+    await _supa.auth.updateUser({data:{avatar_url: urlData.publicUrl}});
+    const { data:{user} } = await _supa.auth.getUser();
+    currentUser = user;
+    renderProfileAvatar();
+    updateUserBtn();
+    if(presenceCh) broadcastPresence(currentUser);
+    showToast('Foto aggiornata');
+  }catch(e){ console.error('[avatar upload]', e); showToast('Errore caricamento foto'); }
+}
+
+function doSignOut(){
+  _supa.auth.signOut().then(()=>{
+    currentUser = null;
+    cleanupPresence();
+    updateUserBtn();
+    closeProfile();
+  });
+}
+
 let _authMode = 'login'; // 'login' | 'signup'
 
 function authSwitchTab(mode){
@@ -4068,27 +4331,30 @@ function updateUserBtn(){
   if(!btn) return;
   if(currentUser){
     btn.classList.add('logged-in');
-    btn.textContent = currentUser.email?.[0]?.toUpperCase() || '👤';
+    const avatarUrl = currentUser.user_metadata?.avatar_url;
+    if(avatarUrl){
+      btn.style.padding = '0';
+      btn.style.overflow = 'hidden';
+      btn.innerHTML = `<img src="${avatarUrl}" style="width:100%;height:100%;object-fit:cover;border-radius:50%" onerror="this.parentElement.textContent='${currentUser.email?.[0]?.toUpperCase()||'U'}'">`;
+    } else {
+      btn.style.padding = '';
+      btn.style.overflow = '';
+      btn.textContent = currentUser.email?.[0]?.toUpperCase() || '👤';
+    }
   } else {
     btn.classList.remove('logged-in');
+    btn.style.padding = '';
+    btn.style.overflow = '';
+    btn.innerHTML = '';
     btn.textContent = '👤';
   }
 }
 
 function toggleUserMenu(){
   if(!currentUser){
-    // Non loggato — mostra auth screen
-    const screen = document.getElementById('auth-screen');
-    screen.classList.remove('hidden','hiding');
+    document.getElementById('auth-screen').classList.remove('hidden','hiding');
   } else {
-    // Loggato — mostra menu semplice
-    if(confirm(`Loggato come ${currentUser.email}\n\nVuoi uscire?`)){
-      _supa.auth.signOut().then(()=>{
-        currentUser = null;
-        cleanupPresence();
-        updateUserBtn();
-      });
-    }
+    openProfile();
   }
 }
 
@@ -4246,19 +4512,26 @@ function close3D(){
  
 function update3DUserMarker(){
   if(!map3d || !uPos) return;
+  const avatarUrl = currentUser?.user_metadata?.avatar_url || null;
   if(_3dUserMarker){
     _3dUserMarker.setLngLat([uPos.lng, uPos.lat]);
-    return;
+    if(_3dUserMarker.getElement().dataset.avatarUrl !== (avatarUrl||'')){
+      _3dUserMarker.remove(); _3dUserMarker = null;
+    } else { return; }
   }
+  const inner = avatarUrl
+    ? `<img src="${avatarUrl}" style="width:100%;height:100%;object-fit:cover;border-radius:50%" onerror="this.style.display='none'">`
+    : 'Tu';
   const el = document.createElement('div');
   el.style.cssText = 'display:flex;flex-direction:column;align-items:center;pointer-events:none';
   el.innerHTML = `
     <div style="width:34px;height:34px;border-radius:50%;background:#c85a3a;border:2.5px solid white;
       display:flex;align-items:center;justify-content:center;color:white;font-size:11px;font-weight:700;
       box-shadow:0 3px 10px rgba(200,90,58,.5);font-family:'Instrument Sans',sans-serif;
-      user-select:none">Tu</div>
+      user-select:none;overflow:hidden">${inner}</div>
     <div style="width:0;height:0;border-left:6px solid transparent;border-right:6px solid transparent;
       border-top:8px solid #c85a3a;margin-top:-1px;filter:drop-shadow(0 2px 2px rgba(0,0,0,.2))"></div>`;
+  el.dataset.avatarUrl = avatarUrl||'';
   _3dUserMarker = new maplibregl.Marker({element:el, anchor:'bottom', rotationAlignment:'viewport', pitchAlignment:'viewport'})
     .setLngLat([uPos.lng, uPos.lat]).addTo(map3d);
 }
@@ -4417,15 +4690,17 @@ function add3DUserMarker(){
   new maplibregl.Marker({element:el,anchor:'center'}).setLngLat([uPos.lng,uPos.lat]).addTo(map3d);
 }
  
-function make3DPresenceEl(initial, color){
+function make3DPresenceEl(initial, color, avatarUrl=null){
   const el=document.createElement('div');
-  // pointer-events:all garantisce click; transform-style:flat lo tiene sempre verso lo schermo
   el.style.cssText='display:flex;flex-direction:column;align-items:center;cursor:pointer;pointer-events:all';
+  const inner = avatarUrl
+    ? `<img src="${avatarUrl}" style="width:100%;height:100%;object-fit:cover;border-radius:50%" onerror="this.style.display='none'">`
+    : initial;
   el.innerHTML=`
     <div style="width:34px;height:34px;border-radius:50%;background:${color};border:2.5px solid white;
       display:flex;align-items:center;justify-content:center;color:white;font-size:13px;font-weight:700;
       box-shadow:0 3px 10px rgba(0,0,0,.3);font-family:'Instrument Sans',sans-serif;
-      user-select:none">${initial}</div>
+      user-select:none;overflow:hidden">${inner}</div>
     <div style="width:0;height:0;border-left:6px solid transparent;border-right:6px solid transparent;
       border-top:8px solid ${color};margin-top:-1px;filter:drop-shadow(0 2px 2px rgba(0,0,0,.2))"></div>`;
   return el;
@@ -4448,13 +4723,23 @@ function refresh3DPresence(){
 
     const color=COLORS[uid.charCodeAt(0)%COLORS.length];
     const initial=(p.display||'?').charAt(0).toUpperCase();
+    const avatarUrl=p.avatar_url||null;
 
     if(_3dMarkersPresence[key]){
-      // Aggiorna solo posizione
       _3dMarkersPresence[key].setLngLat([p.lng,p.lat]);
+      // Ricrea elemento se avatar cambiato
+      const el=_3dMarkersPresence[key].getElement();
+      if(el.dataset.avatarUrl !== (avatarUrl||'')){
+        const newEl=make3DPresenceEl(initial,color,avatarUrl);
+        newEl.dataset.avatarUrl=avatarUrl||'';
+        newEl.addEventListener('click',()=>showToast(`${p.display||'Utente'} · in giro adesso`));
+        _3dMarkersPresence[key].remove();
+        _3dMarkersPresence[key]=new maplibregl.Marker({element:newEl,anchor:'bottom',rotationAlignment:'viewport',pitchAlignment:'viewport'})
+          .setLngLat([p.lng,p.lat]).addTo(map3d);
+      }
     } else {
-      // Crea nuovo marker — MapLibre Marker è sempre billboard (DOM element)
-      const el=make3DPresenceEl(initial,color);
+      const el=make3DPresenceEl(initial,color,avatarUrl);
+      el.dataset.avatarUrl=avatarUrl||'';
       el.addEventListener('click',()=>showToast(`${p.display||'Utente'} · in giro adesso`));
       _3dMarkersPresence[key]=new maplibregl.Marker({element:el,anchor:'bottom',rotationAlignment:'viewport',pitchAlignment:'viewport'})
         .setLngLat([p.lng,p.lat]).addTo(map3d);
